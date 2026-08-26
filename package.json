@@ -1,0 +1,23 @@
+{
+  "name": "tienda-131",
+  "version": "1.0.0",
+  "description": "Tienda online de arte y stickers - 131",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "engines": {
+    "node": ">=18.18.0"
+  },
+  "dependencies": {
+    "@libsql/client": "^0.17.4",
+    "cloudinary": "^2.10.1",
+    "dotenv": "^16.4.5",
+    "ejs": "^3.1.10",
+    "express": "^4.21.0",
+    "express-session": "^1.18.0",
+    "multer": "^2.0.1",
+    "stripe": "^16.12.0"
+  }
+}

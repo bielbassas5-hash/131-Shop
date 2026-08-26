@@ -1,0 +1,29 @@
+<% pageTitle = product.title %>
+<%- include('partials/header') %>
+
+<div class="product-detail">
+  <div class="thumb">
+    <% if (product.image_path) { %>
+      <img src="<%= product.image_path %>" alt="<%= product.title %>" />
+    <% } %>
+  </div>
+  <div class="info">
+    <span class="type-tag"><%= product.type %></span>
+    <h1><%= product.title %></h1>
+    <div class="price"><%= (product.price_cents / 100).toFixed(2) %> &euro;</div>
+    <p class="desc"><%= product.description %></p>
+
+    <% if (product.stock > 0) { %>
+      <form method="POST" action="/agregar/<%= product.id %>">
+        <button class="btn" type="submit">Anadir al carrito</button>
+      </form>
+      <% if (product.stock <= 3) { %>
+        <p class="stock-note">Quedan solo <%= product.stock %> unidades.</p>
+      <% } %>
+    <% } else { %>
+      <p class="stock-note">Agotado.</p>
+    <% } %>
+  </div>
+</div>
+
+<%- include('partials/footer') %>

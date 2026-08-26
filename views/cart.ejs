@@ -1,0 +1,57 @@
+<% pageTitle = 'Carrito' %>
+<%- include('partials/header') %>
+
+<h1>Tu carrito</h1>
+
+<% if (items.length === 0) { %>
+  <div class="empty-state">
+    <p>Tu carrito esta vacio.</p>
+    <a class="btn" href="/">Ver la tienda</a>
+  </div>
+<% } else { %>
+  <table class="simple">
+    <thead>
+      <tr>
+        <th></th>
+        <th>Producto</th>
+        <th>Precio</th>
+        <th>Cantidad</th>
+        <th>Subtotal</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% items.forEach(i => { %>
+        <tr>
+          <td>
+            <% if (i.image_path) { %><img class="thumb-sm" src="<%= i.image_path %>" alt="" /><% } %>
+          </td>
+          <td><%= i.title %></td>
+          <td><%= (i.price_cents / 100).toFixed(2) %> &euro;</td>
+          <td>
+            <form method="POST" action="/actualizar/<%= i.id %>">
+              <input class="qty-input" type="number" name="quantity" min="0" value="<%= i.quantity %>" onchange="this.form.submit()" />
+            </form>
+          </td>
+          <td><%= (i.subtotal / 100).toFixed(2) %> &euro;</td>
+          <td>
+            <form method="POST" action="/quitar/<%= i.id %>">
+              <button class="btn small danger" type="submit">Quitar</button>
+            </form>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+
+  <div class="totals">
+    <div>Total: <span class="grand"><%= (total / 100).toFixed(2) %> &euro;</span></div>
+    <p style="color: var(--text-dim); font-size: 0.85rem;">El envio se calcula en el siguiente paso.</p>
+  </div>
+
+  <div style="text-align:right; margin-top: 16px;">
+    <a class="btn" href="/checkout">Ir a pagar</a>
+  </div>
+<% } %>
+
+<%- include('partials/footer') %>

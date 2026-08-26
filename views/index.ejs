@@ -1,0 +1,34 @@
+<% pageTitle = 'Tienda' %>
+<%- include('partials/header') %>
+
+<div class="hero">
+  <h1>Arte original y stickers</h1>
+  <p>Piezas hechas a mano por <%= artistName %>. Ediciones limitadas, envio a domicilio.</p>
+</div>
+
+<% if (products.length === 0) { %>
+  <div class="empty-state">
+    <p>Todavia no hay productos publicados.</p>
+  </div>
+<% } else { %>
+  <div class="grid">
+    <% products.forEach(p => { %>
+      <a class="card" href="/producto/<%= p.id %>">
+        <div class="thumb">
+          <% if (p.image_path) { %>
+            <img src="<%= p.image_path %>" alt="<%= p.title %>" />
+          <% } else { %>
+            Sin imagen
+          <% } %>
+        </div>
+        <div class="body">
+          <span class="type-tag"><%= p.type %></span>
+          <h3><%= p.title %></h3>
+          <span class="price"><%= (p.price_cents / 100).toFixed(2) %> &euro;</span>
+        </div>
+      </a>
+    <% }) %>
+  </div>
+<% } %>
+
+<%- include('partials/footer') %>

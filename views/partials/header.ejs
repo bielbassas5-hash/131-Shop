@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title><%= typeof pageTitle !== 'undefined' ? pageTitle + ' · ' + artistName : artistName %></title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <header class="site">
+    <div class="wrap">
+      <a href="/" class="logo"><%= artistName %><span>.</span></a>
+      <nav class="main">
+        <a href="/">Tienda</a>
+        <a href="/carrito" class="cart-link">
+          Carrito
+          <% if (cartCount > 0) { %><span class="cart-badge"><%= cartCount %></span><% } %>
+        </a>
+      </nav>
+    </div>
+  </header>
+  <main>
+    <div class="wrap">

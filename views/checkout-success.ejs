@@ -1,0 +1,44 @@
+<% pageTitle = 'Pedido confirmado' %>
+<%- include('partials/header') %>
+
+<% if (order.status === 'paid') { %>
+  <div class="alert success">Pago confirmado. Gracias por tu compra!</div>
+<% } else { %>
+  <div class="alert info">Pedido recibido. Falta completar el pago.</div>
+<% } %>
+
+<h1>Pedido #<%= order.id %></h1>
+
+<table class="simple">
+  <% items.forEach(i => { %>
+    <tr>
+      <td><%= i.title %> x<%= i.quantity %></td>
+      <td><%= ((i.price_cents * i.quantity) / 100).toFixed(2) %> &euro;</td>
+    </tr>
+  <% }) %>
+</table>
+
+<div class="totals">
+  <span class="grand"><%= (order.total_cents / 100).toFixed(2) %> &euro;</span>
+</div>
+
+<% if (!stripeConfigured && order.status !== 'paid') { %>
+  <div style="margin-top: 30px;">
+    <h3>Como pagar</h3>
+    <p>Realiza el pago por transferencia bancaria o Bizum indicando <strong>"Pedido #<%= order.id %>"</strong> en el concepto:</p>
+    <table class="simple">
+      <tr><th>Transferencia (IBAN)</th><td><%= bankIban %></td></tr>
+      <tr><th>Bizum</th><td><%= bizumPhone %></td></tr>
+      <tr><th>Importe</th><td><%= (order.total_cents / 100).toFixed(2) %> &euro;</td></tr>
+    </table>
+    <p style="color: var(--text-dim); font-size: 0.9rem;">
+      En cuanto se reciba el pago, prepararemos tu pedido para el envio. Recibiras confirmacion por email a <%= order.customer_email %>.
+    </p>
+  </div>
+<% } %>
+
+<div style="margin-top: 30px;">
+  <a class="btn secondary" href="/">Volver a la tienda</a>
+</div>
+
+<%- include('partials/footer') %>

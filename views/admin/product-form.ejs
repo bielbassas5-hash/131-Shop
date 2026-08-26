@@ -1,0 +1,49 @@
+<% pageTitle = product ? 'Editar producto' : 'Nuevo producto' %>
+<%- include('../partials/header') %>
+
+<h1><%= product ? 'Editar producto' : 'Nuevo producto' %></h1>
+
+<% if (error) { %>
+  <div class="alert error"><%= error %></div>
+<% } %>
+
+<form class="stack" method="POST" action="<%= product ? '/admin/productos/' + product.id + '/editar' : '/admin/productos/nuevo' %>" enctype="multipart/form-data">
+  <div>
+    <label>Titulo</label>
+    <input type="text" name="title" value="<%= product ? product.title : '' %>" required />
+  </div>
+  <div>
+    <label>Descripcion</label>
+    <textarea name="description"><%= product ? product.description : '' %></textarea>
+  </div>
+  <div class="row2">
+    <div>
+      <label>Precio (EUR)</label>
+      <input type="number" step="0.01" min="0" name="price" value="<%= product ? (product.price_cents / 100).toFixed(2) : '' %>" required />
+    </div>
+    <div>
+      <label>Stock (unidades disponibles)</label>
+      <input type="number" min="0" name="stock" value="<%= product ? product.stock : 1 %>" required />
+    </div>
+  </div>
+  <div>
+    <label>Tipo</label>
+    <select name="type">
+      <option value="dibujo" <%= product && product.type === 'dibujo' ? 'selected' : '' %>>Dibujo original</option>
+      <option value="print" <%= product && product.type === 'print' ? 'selected' : '' %>>Print / lamina</option>
+      <option value="sticker" <%= !product || product.type === 'sticker' ? 'selected' : '' %>>Sticker</option>
+    </select>
+  </div>
+  <div>
+    <label>Imagen <%= product ? '(deja vacio para mantener la actual)' : '' %></label>
+    <input type="file" name="image" accept="image/*" <%= product ? '' : 'required' %> />
+  </div>
+  <% if (product) { %>
+    <div>
+      <label><input type="checkbox" name="active" value="1" <%= product.active ? 'checked' : '' %> style="width:auto; display:inline-block; margin-right:8px;" />Visible en la tienda</label>
+    </div>
+  <% } %>
+  <button class="btn block" type="submit"><%= product ? 'Guardar cambios' : 'Publicar producto' %></button>
+</form>
+
+<%- include('../partials/footer') %>

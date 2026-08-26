@@ -1,0 +1,38 @@
+<% pageTitle = 'Pedidos' %>
+<%- include('../partials/header') %>
+
+<div class="admin-topbar">
+  <h1>Pedidos</h1>
+  <a class="btn secondary" href="/admin">Volver a productos</a>
+</div>
+
+<% if (orders.length === 0) { %>
+  <div class="empty-state"><p>Todavia no hay pedidos.</p></div>
+<% } else { %>
+  <table class="simple">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Cliente</th>
+        <th>Total</th>
+        <th>Estado</th>
+        <th>Fecha</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% orders.forEach(o => { %>
+        <tr>
+          <td>#<%= o.id %></td>
+          <td><%= o.customer_name %><br /><small style="color:var(--text-dim);"><%= o.customer_email %></small></td>
+          <td><%= (o.total_cents / 100).toFixed(2) %> &euro;</td>
+          <td><span class="badge <%= o.status %>"><%= o.status %></span></td>
+          <td><%= o.created_at %></td>
+          <td><a class="btn small secondary" href="/admin/pedidos/<%= o.id %>">Ver</a></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+<% } %>
+
+<%- include('../partials/footer') %>
