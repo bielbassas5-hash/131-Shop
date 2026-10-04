@@ -725,6 +725,12 @@ async function main() {
     check('filtro combinado tema + tipo',
       (await anon.get('/tema/montanas?tipo=sticker')).text.includes('No hay resultados') && (await anon.get('/tema/montanas?tipo=print')).text.includes('Pico nevado'));
 
+    // Boton "Detectar y añadir temas" de un producto existente
+    const detectRes = await admin.post(`/admin/productos/${pico}/detectar-temas`, { _csrf: tok });
+    check('detectar temas de un producto existente', detectRes.status === 302 && detectRes.location === `/admin/productos/${pico}/editar`);
+    check('el aviso indica que se detecto con IA', (await admin.get(`/admin/productos/${pico}/editar`)).text.includes('Temas detectados con IA'));
+    check('detectar temas exige ser admin', (await anon.post(`/admin/productos/${pico}/detectar-temas`, { _csrf: await anon.csrf('/admin/login') })).location === '/admin/login');
+
     // 2) La salida del modelo se sanea
     await mk({ ...base0, title: 'Hostil', auto_themes: '1' });
     const grouped2 = (await anon.get('/temas')).text;
