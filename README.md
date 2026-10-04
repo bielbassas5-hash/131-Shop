@@ -8,16 +8,16 @@ Tienda online para vender dibujos, prints y stickers hechos a mano. Node.js + Ex
 npm install
 cp .env.example .env     # y edita los valores
 npm run dev              # http://localhost:3001
-npm test                 # 128 pruebas automáticas (seguridad, pedidos, pagos, emails...)
+npm test                 # ~190 pruebas automáticas (seguridad, pedidos, pagos, emails, temas...)
 ```
 
 Sin `TURSO_*` ni `CLOUDINARY_*` usa un archivo SQLite local (`data/store.db`) y guarda las imágenes en `public/uploads`. Para rellenar la tienda local con productos de ejemplo: `node scripts/seed-demo.js` (con el servidor en marcha).
 
 ## Qué incluye
 
-**Tienda:** catálogo con filtros, búsqueda y orden · ficha con galería de hasta 6 imágenes · carrito con control de stock · envío fijo o gratis desde un importe · recogida en mano opcional · notas del pedido · seguimiento del pedido por enlace privado · páginas legales (privacidad, condiciones/devoluciones, aviso legal) · SEO (sitemap, Open Graph, datos estructurados).
+**Tienda:** catálogo con filtros, búsqueda y orden · **temas** (montañas, retratos, animales…) con páginas propias y vista agrupada · ficha con galería de hasta 6 imágenes · producción **bajo demanda** (sin stock) con plazo de elaboración · envío fijo o gratis desde un importe · recogida en mano opcional · notas del pedido · seguimiento del pedido por enlace privado · páginas legales (privacidad, condiciones/devoluciones, aviso legal) · SEO (sitemap, Open Graph, datos estructurados).
 
-**Panel (`/admin`):** estadísticas, lista de puesta en marcha, productos (subir, editar, ocultar, borrar), pedidos con filtros, número de seguimiento, exportación CSV y aviso al cliente por email.
+**Panel (`/admin`):** estadísticas, lista de puesta en marcha, productos (subir, editar, ocultar, borrar), gestión de temas, pedidos con filtros y estados (pendiente → pagado → en producción → enviado), número de seguimiento, exportación CSV y aviso al cliente por email.
 
 **Cobro:** por defecto **Bizum / transferencia** (sin comisiones; confirmas el pago a mano en el panel). Si defines `STRIPE_SECRET_KEY` se cobra con tarjeta vía Stripe Checkout.
 
@@ -41,11 +41,29 @@ Todas se configuran en Render → tu servicio → **Environment**. Las que falta
 | `SITE_URL` | URL pública (`https://one31-shop.onrender.com`): enlaces de emails, sitemap, SEO |
 | `BREVO_API_KEY`, `MAIL_FROM`, `OWNER_EMAIL` | Avisos por email (ver abajo) |
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | Solo si cobras con tarjeta |
-| `PENDING_EXPIRY_DAYS` | Días que se reserva el stock de un pedido sin pagar (5) |
+| `PENDING_EXPIRY_DAYS` | Días tras los que se cancela un pedido sin pagar (5) |
+| `LEAD_TIME` | Plazo de elaboración que ven los clientes (p. ej. `5-7 días laborables`) |
+| `TRACK_STOCK` | `1` para limitar unidades por producto. Por defecto **desactivado** (bajo demanda) |
+| `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` | Detección de temas con IA a partir de la imagen (opcional) |
 
 ### Avisos por email (opcional, gratis)
 
 Render gratis bloquea el SMTP, así que se usa la API HTTP de [Brevo](https://www.brevo.com) (300 emails/día gratis): crea cuenta, verifica un remitente (`MAIL_FROM`), genera una clave API (`BREVO_API_KEY`) y pon tu correo en `OWNER_EMAIL`. Recibirás un email por cada pedido nuevo y el cliente recibirá confirmación, pago recibido y envío.
+
+### Temas y clasificación automática
+
+Cada producto puede tener hasta 5 temas. Aparecen como filtros en la tienda, en páginas propias (`/tema/montanas`) y agrupados en `/temas`. Vienen creados los más habituales (Montañas, Retratos, Animales, Paisajes, Flores y plantas, Ciudad, Mar, Espacio, Fantasía, Personajes, Comida, Letras) y puedes crear, renombrar o borrar los que quieras en **Panel → Temas**.
+
+Al subir un producto, si no eliges ningún tema y dejas marcada la casilla, se detectan solos:
+
+- **Con IA** (si defines `ANTHROPIC_API_KEY`): la API de Claude mira la imagen y devuelve 1-3 temas, reutilizando los existentes. Cuesta del orden de 0,01 € por imagen y solo se llama cuando tú guardas un producto o pulsas "Detectar temas"; nunca por visitas de clientes. Si falla, se usa el método gratuito.
+- **Gratis**: por palabras del título y la descripción ("gato", "montaña", "retrato"…).
+
+"Clasificar productos sin tema" (Panel → Temas) procesa los pendientes por lotes. La respuesta del modelo se sanea siempre: solo se aceptan nombres de 2-30 letras/números.
+
+### Producción bajo demanda
+
+No hay unidades ni "agotado". El límite es de 10 por línea de pedido. La ficha, el carrito y las condiciones indican que se elabora bajo pedido (y el `LEAD_TIME` si lo defines). El estado **En producción** informa al cliente de que su pedido se está elaborando. Si algún día necesitas stock, `TRACK_STOCK=1` lo reactiva (reserva al pedir, devolución al cancelar).
 
 ### Stripe (opcional)
 

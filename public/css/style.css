@@ -223,7 +223,7 @@ input[aria-invalid='true'], select[aria-invalid='true'], textarea[aria-invalid='
 .mini-line { display: flex; justify-content: space-between; gap: 12px; font-size: .92rem; padding: 6px 0; }
 
 /* ---------- Pedido ---------- */
-.steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; margin: 26px 0 34px; counter-reset: step; }
+.steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 0; margin: 26px 0 34px; counter-reset: step; }
 .step { position: relative; text-align: center; font-size: .85rem; color: var(--muted); padding-top: 44px; }
 .step::before {
   counter-increment: step; content: counter(step);
@@ -269,6 +269,7 @@ table.simple img.thumb-sm { width: 52px; height: 52px; object-fit: cover; border
 }
 .badge.pending { background: rgba(255, 193, 94, .14); color: var(--warn); }
 .badge.paid { background: rgba(61, 220, 151, .14); color: var(--ok); }
+.badge.production { background: rgba(179, 136, 255, .16); color: #c3a6ff; }
 .badge.shipped { background: rgba(108, 182, 255, .14); color: var(--info); }
 .badge.cancelled { background: rgba(255, 100, 100, .14); color: var(--danger); }
 .badge.hidden { background: var(--surface-2); color: var(--muted); }
@@ -305,7 +306,8 @@ table.simple img.thumb-sm { width: 52px; height: 52px; object-fit: cover; border
   .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
   .card-body { padding: 12px 14px 14px; }
   .price { font-size: 1.05rem; }
-  .nav a:not(.cart-link) { display: none; }
+  .nav { gap: 2px; }
+  .nav a { padding: 8px 9px; font-size: .9rem; }
   .cart-line { grid-template-columns: 68px 1fr; }
   .cart-line img { width: 68px; height: 68px; }
   .line-total { grid-column: 2; text-align: left; }

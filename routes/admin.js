@@ -63,6 +63,8 @@ function launchChecklist() {
     { ok: !!(e.LEGAL_NAME && e.LEGAL_NIF && e.LEGAL_ADDRESS), label: 'Datos del titular en las páginas legales', hint: 'LEGAL_NAME, LEGAL_NIF, LEGAL_ADDRESS' },
     { ok: !!e.SITE_URL, label: 'Dirección pública de la web (para enlaces y SEO)', hint: 'SITE_URL' },
     { ok: mailConfigured() && !!e.OWNER_EMAIL, label: 'Avisos por email de pedidos nuevos (opcional)', hint: 'BREVO_API_KEY, MAIL_FROM, OWNER_EMAIL', optional: true },
+    { ok: classify.aiEnabled(), label: 'Detección de temas con IA a partir de la imagen (opcional; sin ella se usan palabras del título)', hint: 'ANTHROPIC_API_KEY', optional: true },
+    ...(trackStock() ? [] : [{ ok: !!e.LEAD_TIME, label: 'Plazo de elaboración que se muestra a los clientes (opcional)', hint: 'LEAD_TIME', optional: true }]),
   ];
 }
 
@@ -108,13 +110,13 @@ router.get(
     const products = await db.all('SELECT * FROM products ORDER BY created_at DESC');
     const counts = await db.all('SELECT status, COUNT(*) AS n FROM orders GROUP BY status');
     const revenue = await db.get(
-      "SELECT COALESCE(SUM(total_cents), 0) AS total FROM orders WHERE status IN ('paid', 'shipped')"
+      "SELECT COALESCE(SUM(total_cents), 0) AS total FROM orders WHERE status IN ('paid', 'production', 'shipped')"
     );
     const byStatus = Object.fromEntries(counts.map((c) => [c.status, Number(c.n)]));
     const stats = {
       revenue: Number(revenue.total),
       pending: byStatus.pending || 0,
-      toShip: byStatus.paid || 0,
+      toShip: (byStatus.paid || 0) + (byStatus.production || 0),
       soldOut: trackStock() ? products.filter((p) => p.active && p.stock <= 0).length : 0,
       lowStock: trackStock() ? products.filter((p) => p.active && p.stock > 0 && p.stock <= 2).length : 0,
     };
@@ -352,7 +354,8 @@ router.post(
   '/admin/temas/clasificar',
   requireAdmin,
   wrap(async (req, res) => {
-    const pending = await themesLib.productsWithoutThemes(15);
+    const batch = classify.aiEnabled() ? 5 : 30; // la IA tarda unos segundos por imagen
+    const pending = await themesLib.productsWithoutThemes(batch);
     let done = 0;
     for (const p of pending) {
       const d = await classify.classifyProduct(p);
@@ -508,6 +511,7 @@ router.post(
         const base = res.locals.shop.siteUrl;
         const id = Number(req.params.id);
         if (req.body.status === 'paid' && previous === 'pending') notify.paid(id, base);
+        if (req.body.status === 'production' && previous !== 'production') notify.production(id, base);
         if (req.body.status === 'shipped' && previous !== 'shipped') notify.shipped(id, base);
       }
       req.session.flash = { type: 'success', msg: 'Pedido actualizado.' };

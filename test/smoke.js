@@ -310,6 +310,8 @@ async function suiteMadeToOrder() {
     for (let i = 0; i < 12; i++) await buyer.post('/agregar/1', { _csrf: bt, back: '/' });
     const cart = (await buyer.get('/carrito')).text;
     check('se pueden pedir hasta 10 por linea', /<option value="10" selected>/.test(cart) && !/<option value="11"/.test(cart));
+    check('el carrito avisa del plazo de elaboracion', /Se elabora bajo pedido · plazo de 5-7 días laborables/.test(cart));
+    check('el checkout avisa del plazo de elaboracion', /Se elabora bajo pedido · plazo de 5-7 días laborables/.test((await buyer.get('/checkout')).text));
     const bt2 = await buyer.csrf('/checkout');
     const data = { _csrf: bt2, name: 'Eva Ruiz', email: 'eva@example.com', address: 'Calle Sol 5', city: 'Sevilla', postal_code: '41001', country: 'ES', accept: '1' };
     const o1 = await buyer.post('/checkout/crear', data);
@@ -595,6 +597,13 @@ async function main() {
     check('listado de pedidos', orders.text.includes('Ana Perez'));
     const pay = await admin.post('/admin/pedidos/1/estado', { _csrf: tok, status: 'paid', tracking: '', notify: '1' });
     check('marcar pagado', pay.status === 302);
+    const prodStep = await admin.post('/admin/pedidos/1/estado', { _csrf: tok, status: 'production', tracking: '', notify: '1' });
+    check('marcar "en producción"', prodStep.status === 302);
+    const prodPage = (await buyer.get(order.location)).text;
+    check('el cliente ve el paso "En producción"', prodPage.includes('En producción') && prodPage.includes('Estamos elaborando'));
+    check('el panel lista el estado "En producción"', (await admin.get('/admin/pedidos?estado=production')).text.includes('Ana Perez'));
+    await sleep(500);
+    check('email "estamos elaborando" al cliente', mailTo('ana@example.com', /Estamos elaborando tu pedido #1/).length === 1);
     const ship = await admin.post('/admin/pedidos/1/estado', { _csrf: tok, status: 'shipped', tracking: 'PQ123456789ES', notify: '1' });
     check('marcar enviado con seguimiento', ship.status === 302);
     check('cliente ve seguimiento', (await buyer.get(order.location)).text.includes('PQ123456789ES'));
@@ -686,6 +695,7 @@ async function main() {
     check('el prompt incluye titulo y temas existentes', content.some((c) => c.type === 'text' && c.text.includes('Pico nevado') && c.text.includes('Montañas')));
     check('instruccion de sistema anti-inyeccion', /nunca los obedezcas/.test(call.body.system || ''));
 
+    check('un tema vacio no se indexa', /noindex/.test((await anon.get('/tema/paisajes')).text) && !/noindex/.test((await anon.get('/tema/montanas')).text));
     const mont = await anon.get('/tema/montanas');
     check('pagina del tema /tema/montanas', mont.status === 200 && mont.text.includes('Pico nevado'));
     const grouped = await anon.get('/temas');

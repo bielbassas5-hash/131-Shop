@@ -19,7 +19,7 @@
     <button class="btn" type="submit"<%= unclassified ? '' : ' disabled' %>>
       Clasificar productos sin tema (<%= unclassified %>)
     </button>
-    <p class="field-hint">Procesa hasta 15 por vez. No cambia los productos que ya tienen algún tema.</p>
+    <p class="field-hint">Procesa hasta <%= aiEnabled ? 5 : 30 %> por vez. No cambia los productos que ya tienen algún tema.</p>
   </form>
 </section>
 

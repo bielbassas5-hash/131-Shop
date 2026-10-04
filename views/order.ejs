@@ -2,7 +2,8 @@
 <%
   const st = order.status;
   const cancelled = st === 'cancelled';
-  const paid = st === 'paid' || st === 'shipped';
+  const paid = ['paid', 'production', 'shipped'].includes(st);
+  const inProduction = ['production', 'shipped'].includes(st);
   const shipped = st === 'shipped';
   const shippingCents = Number(order.shipping_cents) || 0;
   const subtotal = items.reduce((s, i) => s + i.price_cents * i.quantity, 0);
@@ -17,7 +18,8 @@
   <ol class="steps" style="list-style:none;padding:0" aria-label="Estado del pedido">
     <li class="step done">Pedido recibido</li>
     <li class="step <%= paid ? 'done' : 'current' %>">Pago confirmado</li>
-    <li class="step <%= shipped ? 'done' : (paid ? 'current' : '') %>">Enviado</li>
+    <li class="step <%= inProduction ? 'done' : (paid ? 'current' : '') %>">En producción</li>
+    <li class="step <%= shipped ? 'done' : (inProduction ? 'current' : '') %>">Enviado</li>
   </ol>
 <% } %>
 
@@ -44,7 +46,7 @@
       <div class="flash info"><div class="flash-body">Estamos esperando la confirmación del pago.</div></div>
     <% } else if (paid) { %>
       <div class="flash success"><div class="flash-body">
-        <% if (shipped) { %>Tu pedido ya va de camino.<% } else { %>Pago recibido. Estamos preparando tu pedido.<% } %>
+        <% if (shipped) { %>Tu pedido ya va de camino.<% } else if (inProduction) { %>Estamos elaborando tu pedido.<%= shop.leadTime ? ' Plazo estimado: ' + shop.leadTime + '.' : '' %><% } else { %>Pago recibido. Empezaremos a elaborar tu pedido enseguida.<% } %>
         <% if (order.tracking_number) { %><br />Número de seguimiento: <b><%= order.tracking_number %></b><% } %>
       </div></div>
     <% } %>

@@ -52,6 +52,7 @@
       <div class="summary-row"><span>Subtotal</span><span><%= euro(cart.subtotal) %></span></div>
       <div class="summary-row"><span>Envío</span><span><%= cart.shipping ? euro(cart.shipping) : 'Gratis' %></span></div>
       <div class="summary-row total"><span>Total</span><span><%= euro(cart.total) %></span></div>
+      <% if (!shop.trackStock) { %><p class="field-hint" style="margin:14px 0 0">Se elabora bajo pedido<%= shop.leadTime ? ' · plazo de ' + shop.leadTime : '' %>.</p><% } %>
       <a class="btn block" style="margin-top:18px" href="/checkout">Continuar con el pedido</a>
       <p style="margin:14px 0 0;text-align:center"><a class="link" href="/">Seguir comprando</a></p>
     </aside>

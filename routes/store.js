@@ -38,20 +38,24 @@ async function renderCatalog(req, res, theme) {
     args.push(like, like);
   }
 
-  const products = await db.all(
+  const [products, themes] = await Promise.all([
+    db.all(
     `SELECT * FROM products WHERE ${where.join(' AND ')}
      ORDER BY ${trackStock() ? '(stock > 0) DESC,' : ''} ${SORTS[orden]} LIMIT 120`,
     args
-  );
+    ),
+    themesLib.publicThemes(),
+  ]);
 
   res.render('index', {
     products,
     theme,
-    themes: await themesLib.publicThemes(),
+    themes,
     filters: { tipo, orden, q, tema: theme ? theme.slug : '' },
     meta: {
       title: theme ? theme.name : tipo ? TYPE_PLURALS[tipo] : 'Tienda',
       description: theme ? `${theme.name}: dibujos, prints y stickers de 131.` : 'Dibujos, prints y stickers de 131.',
+      noindex: !!theme && products.length === 0, // un tema vacio no es contenido para buscadores
     },
   });
 }
@@ -105,17 +109,19 @@ router.get(
     const product = await db.get('SELECT * FROM products WHERE id = ? AND active = 1', [req.params.id]);
     if (!product) return res.status(404).render('error', { status: 404 });
 
-    const productThemes = await themesLib.themesOf(product.id);
     // Relacionados: primero los que comparten tema, luego el mismo tipo
-    const related = await db.all(
+    const relatedQuery = db.all(
       `SELECT * FROM products p WHERE p.active = 1 ${trackStock() ? 'AND p.stock > 0' : ''} AND p.id != ?
        ORDER BY (SELECT COUNT(*) FROM product_themes a JOIN product_themes b ON a.theme_id = b.theme_id
                  WHERE a.product_id = p.id AND b.product_id = ?) DESC,
                 (p.type = ?) DESC, p.created_at DESC LIMIT 4`,
       [product.id, product.id, product.type]
     );
-
-    const extras = await extrasOf(product.id);
+    const [productThemes, related, extras] = await Promise.all([
+      themesLib.themesOf(product.id),
+      relatedQuery,
+      extrasOf(product.id),
+    ]);
     const gallery = [product.image_path, ...extras.map((e) => e.image_path)].filter(Boolean);
 
     res.render('product', {

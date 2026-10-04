@@ -94,6 +94,7 @@
     <% }) %>
     <div class="summary-row"><span>Envío</span><span data-ship-out><%= cart.shipping ? euro(cart.shipping) : 'Gratis' %></span></div>
     <div class="summary-row total"><span>Total</span><span data-total-out><%= euro(cart.total) %></span></div>
+    <% if (!shop.trackStock) { %><p class="field-hint" style="margin:14px 0 0">Se elabora bajo pedido<%= shop.leadTime ? ' · plazo de ' + shop.leadTime : '' %>.</p><% } %>
     <p style="margin:14px 0 0"><a class="link" href="/carrito">Editar carrito</a></p>
   </aside>
 </div>
