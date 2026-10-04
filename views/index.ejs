@@ -5,29 +5,19 @@
     const params = new URLSearchParams();
     Object.keys(merged).forEach((k) => { if (merged[k] && !(k === 'orden' && merged[k] === 'nuevo')) params.set(k, merged[k]); });
     const s = params.toString();
-    return '/' + (s ? '?' + s : '') + '#catalogo';
+    return '/' + (s ? '?' + s : '');
   };
   const filtered = filters.tipo || filters.q;
 %>
 
-<% if (!filtered) { %>
-<section class="hero">
-  <p class="eyebrow">Arte hecho a mano</p>
-  <h1>Dibujos, prints y <em>stickers</em> con alma.</h1>
-  <p class="lead">Piezas originales de <%= artistName %> en ediciones limitadas. Cada una se prepara a mano y llega a tu casa.</p>
-  <div class="actions">
-    <a class="btn" href="#catalogo">Ver catálogo</a>
-    <a class="btn ghost" href="/legal/condiciones">Envíos y devoluciones</a>
+<section aria-labelledby="catalogo-titulo">
+  <div class="page-head">
+    <h1 id="catalogo-titulo"><%= filters.tipo ? TYPE_PLURALS[filters.tipo] : 'Tienda' %></h1>
+    <p class="muted">
+      Envío <%= euro(shop.shippingCents) %><% if (shop.freeFrom) { %>, gratis desde <%= euro(shop.freeFrom) %><% } %><% if (shop.pickupEnabled) { %> · Recogida en mano disponible<% } %>
+    </p>
   </div>
-  <ul class="perks">
-    <li>Ediciones limitadas</li>
-    <li>Envío desde <%= euro(shop.shippingCents) %><% if (shop.freeFrom) { %> &middot; gratis desde <%= euro(shop.freeFrom) %><% } %></li>
-    <li>Hecho a mano</li>
-  </ul>
-</section>
-<% } %>
 
-<section id="catálogo" aria-labelledby="catalogo-titulo">
   <div class="toolbar">
     <div class="chips" role="group" aria-label="Filtrar por tipo">
       <a class="chip<%= !filters.tipo ? ' active' : '' %>" href="<%= link({ tipo: '' }) %>">Todo</a>
@@ -35,30 +25,27 @@
         <a class="chip<%= filters.tipo === t ? ' active' : '' %>" href="<%= link({ tipo: t }) %>"><%= TYPE_PLURALS[t] %></a>
       <% }) %>
     </div>
-    <form class="filters" method="GET" action="/#catalogo" role="search">
+    <form class="filters" method="GET" action="/" role="search">
       <% if (filters.tipo) { %><input type="hidden" name="tipo" value="<%= filters.tipo %>" /><% } %>
       <label class="sr-only" for="q">Buscar</label>
-      <input id="q" type="search" name="q" value="<%= filters.q %>" placeholder="Buscar..." maxlength="40" style="width:190px" />
+      <input id="q" type="search" name="q" value="<%= filters.q %>" placeholder="Buscar" maxlength="40" style="width:190px" />
       <label class="sr-only" for="orden">Ordenar</label>
       <select id="orden" name="orden" data-autosubmit style="width:auto">
-        <option value="nuevo"<%= filters.orden === 'nuevo' ? ' selected' : '' %>>Novedades</option>
+        <option value="nuevo"<%= filters.orden === 'nuevo' ? ' selected' : '' %>>Más recientes</option>
         <option value="precio_asc"<%= filters.orden === 'precio_asc' ? ' selected' : '' %>>Precio: menor a mayor</option>
         <option value="precio_desc"<%= filters.orden === 'precio_desc' ? ' selected' : '' %>>Precio: mayor a menor</option>
       </select>
       <button class="btn secondary small" type="submit">Buscar</button>
     </form>
   </div>
-  <h2 id="catalogo-titulo" class="sr-only">Catálogo</h2>
 
   <% if (products.length === 0) { %>
     <div class="empty-state">
       <% if (filtered) { %>
-        <h2>Sin resultados</h2>
-        <p>No hemos encontrado nada con esos filtros.</p>
+        <p>No hay resultados con esos filtros.</p>
         <a class="btn secondary" href="/">Quitar filtros</a>
       <% } else { %>
-        <h2>Muy pronto</h2>
-        <p>Estamos preparando las primeras piezas. Vuelve en unos días.</p>
+        <p>No hay productos disponibles ahora mismo.</p>
       <% } %>
     </div>
   <% } else { %>

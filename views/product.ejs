@@ -63,7 +63,6 @@
       <% } %>
       <ul>
         <li>Envío <%= shop.freeFrom ? 'desde ' + euro(shop.shippingCents) + ', gratis a partir de ' + euro(shop.freeFrom) : 'a ' + euro(shop.shippingCents) + ' por pedido' %></li>
-        <li>Hecho a mano, edición limitada</li>
         <li><a class="link" href="/legal/condiciones">Devoluciones en 14 días</a></li>
       </ul>
     </div>
@@ -71,7 +70,7 @@
 </div>
 
 <% if (related.length) { %>
-  <div class="section-title"><h2>También te puede gustar</h2></div>
+  <div class="section-title"><h2>Más productos</h2></div>
   <div class="grid">
     <% related.forEach((p) => { %><%- include('partials/product-card', { p }) %><% }) %>
   </div>

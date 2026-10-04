@@ -43,7 +43,7 @@ router.get(
       meta: {
         title: tipo ? TYPE_PLURALS[tipo] : 'Tienda',
         description:
-          'Dibujos originales, prints y stickers hechos a mano por 131. Ediciones limitadas con envío a domicilio.',
+          'Dibujos, prints y stickers de 131.',
       },
     });
   })
@@ -72,7 +72,7 @@ router.get(
       meta: {
         title: product.title,
         description: (product.description || '').replace(/\s+/g, ' ').slice(0, 155) ||
-          `${product.title} - ${TYPE_LABELS[product.type] || 'Arte'} hecho a mano por 131.`,
+          `${product.title} - ${TYPE_LABELS[product.type] || 'Producto'} de 131.`,
         image: product.image_path,
         type: 'product',
       },

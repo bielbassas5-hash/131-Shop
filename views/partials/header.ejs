@@ -1,7 +1,7 @@
 <%
   const m = (typeof meta !== 'undefined' && meta) || {};
-  const pageTitle = m.title ? m.title + ' · ' + artistName : artistName + ' · Arte y stickers hechos a mano';
-  const pageDesc = m.description || 'Dibujos originales, prints y stickers hechos a mano por 131. Ediciones limitadas con envío a domicilio.';
+  const pageTitle = m.title ? m.title + ' · ' + artistName : artistName + ' · Tienda';
+  const pageDesc = m.description || 'Dibujos, prints y stickers de 131.';
   const ogImg = m.image ? thumb(m.image, 1000) : '';
   const ogAbs = ogImg ? (/^https?:/.test(ogImg) ? ogImg : shop.siteUrl + ogImg) : '';
 %><!doctype html>
