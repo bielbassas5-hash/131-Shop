@@ -26,6 +26,7 @@
   --overlay: rgba(11, 11, 13, 0.88);
   --prose: #d6d6dd;
   --art-shadow: rgba(0, 0, 0, 0.45);
+  --field: #121215; /* fondo de los campos de formulario */
   --radius: 8px;
   --radius-sm: 6px;
   --shadow: none;
@@ -42,7 +43,7 @@
   --surface: #ffffff;
   --surface-2: #efe9df;
   --border: #e2dbcf;
-  --border-strong: #cdc4b4;
+  --border-strong: #bdb3a0;
   --text: #1c1a17;
   --muted: #655e53;
   --accent: #c4134c;
@@ -60,6 +61,7 @@
   --overlay: rgba(246, 243, 238, 0.92);
   --prose: #36322b;
   --art-shadow: rgba(40, 30, 10, 0.28);
+  --field: #ffffff;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -176,7 +178,7 @@ label { display: block; font-size: .85rem; font-weight: 500; color: var(--muted)
 input[type='text'], input[type='email'], input[type='tel'], input[type='password'], input[type='number'],
 input[type='search'], select, textarea {
   width: 100%; padding: 11px 14px; min-height: 44px;
-  background: var(--bg-soft); color: var(--text);
+  background: var(--field); color: var(--text);
   border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
   font: inherit; font-size: .95rem; transition: border-color .15s, box-shadow .15s;
 }
@@ -322,7 +324,7 @@ table.simple img.thumb-sm { width: 52px; height: 52px; object-fit: cover; border
 
 /* ---------- Pie ---------- */
 .site-footer { border-top: 1px solid var(--border); background: var(--bg-soft); padding: 44px 0 30px; color: var(--muted); font-size: .9rem; }
-.footer-grid { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 32px; margin-bottom: 30px; }
+.footer-grid { display: grid; grid-template-columns: 1fr auto auto; gap: 32px 72px; margin-bottom: 30px; align-items: start; }
 .footer-grid h4 { font-size: .8rem; text-transform: uppercase; letter-spacing: .12em; color: var(--text); margin-bottom: 12px; }
 .footer-grid ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
 .footer-grid a:hover { color: var(--text); text-decoration: underline; }
