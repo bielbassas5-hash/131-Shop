@@ -65,7 +65,12 @@ Al subir un producto, si no eliges ningún tema y dejas marcada la casilla, se d
 
 Un producto puede tener hasta 8 formatos (por ejemplo un print en A4 y en A3), cada uno con su precio. En el formulario del producto se escribe una línea por formato, con el nombre y el precio separados por dos puntos:
 
-\
+```
+A4: 18,00
+A3: 28,00
+A2: 45,00
+```
+
 Si se rellenan, el cliente elige formato en la ficha, el listado muestra "Desde 18,00 €" y el carrito y el pedido guardan el formato elegido ("Ojo de tigre · A3") con su precio, que siempre se recalcula en el servidor. Si quitas los formatos, el producto vuelve a su precio normal y los carritos que tuvieran un formato retirado se limpian solos.
 
 ### Producción bajo demanda
