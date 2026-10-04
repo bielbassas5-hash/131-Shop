@@ -1,5 +1,6 @@
 // Acceso: inicio y cierre de sesion del administrador.
 const express = require('express');
+const db = require('../../db');
 const { createLimiter, safeEqual, clientIp, wrap } = require('../../lib/security');
 const notify = require('../../lib/notify');
 
@@ -42,11 +43,29 @@ router.post(
     }
 
     loginLimiter.reset(ip);
+
+    // Acceso anterior: si no fue el tuyo, se nota al instante
+    const prev = await db.get("SELECT value FROM settings WHERE key = 'last_login'");
+    await db.run("INSERT OR REPLACE INTO settings (key, value) VALUES ('last_login', ?)", [
+      JSON.stringify({ at: new Date().toISOString(), ip }),
+    ]);
+    let notice = null;
+    try {
+      const p = prev && JSON.parse(prev.value);
+      if (p && p.at) {
+        const when = new Date(p.at).toLocaleString('es-ES', { timeZone: 'Europe/Madrid', dateStyle: 'short', timeStyle: 'short' });
+        notice = { type: 'info', msg: `Último acceso anterior: ${when} desde ${String(p.ip).slice(0, 45)}. Si no fuiste tú, cambia ADMIN_PASSWORD en Render.` };
+      }
+    } catch (_) {
+      /* sin dato previo */
+    }
+
     // Nueva sesión al autenticarse (evita fijación de sesión)
     req.session.regenerate((err) => {
       if (err) throw err;
       req.session.isAdmin = true;
       req.session.cookie.maxAge = ADMIN_SESSION_MS;
+      if (notice) req.session.flash = notice;
       res.redirect('/admin');
     });
   })

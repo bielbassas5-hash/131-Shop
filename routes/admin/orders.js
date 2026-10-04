@@ -3,7 +3,7 @@ const express = require('express');
 const db = require('../../db');
 const { requireAdmin } = require('../../middleware/auth');
 const { wrap } = require('../../lib/security');
-const { text } = require('../../lib/validate');
+const { text, multiline } = require('../../lib/validate');
 const { STATUSES, setStatus, orderEvents, StockError } = require('../../lib/orders');
 const { STATUS_LABELS } = require('../../lib/format');
 const notify = require('../../lib/notify');
@@ -61,7 +61,7 @@ router.get(
       if (!byOrder.has(it.order_id)) byOrder.set(it.order_id, []);
       byOrder.get(it.order_id).push(`${it.quantity}x ${it.title}`);
     }
-    const header = ['Pedido', 'Fecha', 'Estado', 'Nombre', 'Email', 'Teléfono', 'Dirección', 'Ciudad', 'CP', 'País', 'Total EUR', 'Entrega', 'Notas', 'Seguimiento', 'Artículos'];
+    const header = ['Pedido', 'Fecha', 'Estado', 'Nombre', 'Email', 'Teléfono', 'Dirección', 'Ciudad', 'CP', 'País', 'Total EUR', 'Entrega', 'Notas', 'Seguimiento', 'Artículos', 'Nota interna'];
     const rows = orders.map((o) => {
       let s = {};
       try {
@@ -72,7 +72,7 @@ router.get(
       return [
         o.id, o.created_at, STATUS_LABELS[o.status] || o.status, s.name || o.customer_name, s.email || o.customer_email,
         s.phone, s.address, s.city, s.postal_code, s.country, (o.total_cents / 100).toFixed(2),
-        o.shipping_method === 'pickup' ? 'Recogida' : 'Envío', s.notes, o.tracking_number, (byOrder.get(o.id) || []).join(' | '),
+        o.shipping_method === 'pickup' ? 'Recogida' : 'Envío', s.notes, o.tracking_number, (byOrder.get(o.id) || []).join(' | '), o.admin_notes,
       ].map(csvCell).join(',');
     });
     res.set('Content-Type', 'text/csv; charset=utf-8');
@@ -119,6 +119,18 @@ router.get(
       mailConfigured: mailConfigured(),
       meta: { title: `Pedido #${order.id}`, noindex: true },
     });
+  })
+);
+
+// Nota interna: solo la ve el administrador (nunca el cliente)
+router.post(
+  '/admin/pedidos/:id/nota',
+  requireAdmin,
+  wrap(async (req, res) => {
+    if (!/^\d+$/.test(req.params.id)) return res.status(404).render('error', { status: 404 });
+    const res1 = await db.run('UPDATE orders SET admin_notes = ? WHERE id = ?', [multiline(req.body.nota, 500) || null, Number(req.params.id)]);
+    req.session.flash = res1.changes ? { type: 'success', msg: 'Nota guardada.' } : { type: 'error', msg: 'Pedido no encontrado.' };
+    res.redirect(`/admin/pedidos/${req.params.id}`);
   })
 );
 

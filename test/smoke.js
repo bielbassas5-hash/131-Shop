@@ -916,6 +916,20 @@ async function main() {
     console.log('\n# Sesiones y limite de intentos');
     await admin.post('/admin/logout', { _csrf: tok });
     check('logout cierra el acceso', (await admin.get('/admin')).location === '/admin/login');
+    // Aviso del acceso anterior (detecta que otra persona haya entrado)
+    const relogTok = await admin.csrf('/admin/login');
+    const relog = await admin.post('/admin/login', { _csrf: relogTok, password: ADMIN_PASSWORD });
+    const afterRelog = (await admin.get('/admin')).text;
+    check('al volver a entrar se muestra el ultimo acceso anterior', relog.status === 302 && /Último acceso anterior: [^<]*desde/.test(afterRelog));
+    // Nota interna de un pedido: la ve el administrador, nunca el cliente
+    const noteTok = (await admin.get('/admin')).text.match(/name="_csrf" value="([a-f0-9]+)"/)[1];
+    const note = await admin.post('/admin/pedidos/1/nota', { _csrf: noteTok, nota: 'Esperando medidas <b>del cliente</b>' });
+    check('guardar nota interna', note.status === 302);
+    const noteAdmin = (await admin.get('/admin/pedidos/1')).text;
+    check('la nota se ve en el panel (con el HTML escapado)', noteAdmin.includes('Esperando medidas &lt;b&gt;del cliente&lt;/b&gt;') && !noteAdmin.includes('<b>del cliente</b>'));
+    check('el cliente no ve la nota interna', !(await buyer.get(order.location)).text.includes('Esperando medidas'));
+    check('la nota va en el CSV', (await admin.get('/admin/pedidos.csv')).text.includes('Esperando medidas'));
+    check('la nota exige ser administrador', (await anon.post('/admin/pedidos/1/nota', { _csrf: await anon.csrf('/admin/login'), nota: 'x' })).location === '/admin/login');
 
     const brute = new Client();
     const bt2 = await brute.csrf('/admin/login');

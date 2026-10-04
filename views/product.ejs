@@ -28,7 +28,7 @@
     <div class="product-gallery">
       <% if (product.image_path) { %>
         <button type="button" class="zoom" data-lightbox data-full="<%= thumb(product.image_path, 2000) %>" aria-label="Ampliar imagen">
-          <img id="main-image" src="<%= thumb(product.image_path, 1100) %>" alt="<%= product.title %>" width="1100" height="1100" />
+          <img id="main-image" src="<%= thumb(product.image_path, 1100) %>" alt="<%= product.title %>" width="1100" height="1100" fetchpriority="high" decoding="async" />
         </button>
       <% } %>
     </div>

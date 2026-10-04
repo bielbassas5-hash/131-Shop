@@ -64,6 +64,15 @@
       <button class="btn block" type="submit">Guardar</button>
     </form>
     <hr />
+    <form method="POST" action="/admin/pedidos/<%= order.id %>/nota">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+      <div class="field">
+        <label for="nota">Nota interna (solo la ves tú)</label>
+        <textarea id="nota" name="nota" class="short" maxlength="500" placeholder="Ej.: esperando medidas del cliente"><%= order.admin_notes || '' %></textarea>
+      </div>
+      <button class="btn secondary block" type="submit">Guardar nota</button>
+    </form>
+    <hr />
     <a class="btn secondary block" href="<%= mailto %>">Avisar al cliente por email</a>
     <p class="field-hint">Abre tu correo con el mensaje y el enlace de seguimiento ya preparados.</p>
     <p class="field-hint">Enlace del cliente: <a class="link" href="<%= publicLink %>" target="_blank" rel="noopener">ver pedido</a></p>
