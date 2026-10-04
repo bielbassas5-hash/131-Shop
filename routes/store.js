@@ -3,6 +3,7 @@ const db = require('../db');
 const { wrap } = require('../lib/security');
 const { TYPES, TYPE_LABELS, TYPE_PLURALS } = require('../lib/format');
 const { extrasOf } = require('../lib/productImages');
+const { variantsOf } = require('../lib/variants');
 const themesLib = require('../lib/themes');
 const { trackStock } = require('../lib/orders');
 const { slugOf } = db;
@@ -19,7 +20,8 @@ const SLUG_RE = /^[a-z0-9-]{1,40}$/;
 
 // Primera imagen extra del producto: se muestra al pasar el raton por la tarjeta
 const hoverImage = (alias) =>
-  `(SELECT x.image_path FROM product_images x WHERE x.product_id = ${alias}.id ORDER BY x.position, x.id LIMIT 1) AS hover_image`;
+  `(SELECT x.image_path FROM product_images x WHERE x.product_id = ${alias}.id ORDER BY x.position, x.id LIMIT 1) AS hover_image,
+   (SELECT COUNT(*) FROM product_variants v WHERE v.product_id = ${alias}.id) AS variant_count`;
 
 // Catalogo con filtros. `theme` (opcional) agrupa solo los productos de ese tema.
 async function renderCatalog(req, res, theme) {
@@ -128,16 +130,18 @@ router.get(
                 (p.type = ?) DESC, p.created_at DESC LIMIT 4`,
       [product.id, product.id, product.type]
     );
-    const [productThemes, related, extras] = await Promise.all([
+    const [productThemes, related, extras, variants] = await Promise.all([
       themesLib.themesOf(product.id),
       relatedQuery,
       extrasOf(product.id),
+      variantsOf(product.id),
     ]);
     const gallery = [product.image_path, ...extras.map((e) => e.image_path)].filter(Boolean);
 
     res.render('product', {
       product,
       productThemes,
+      variants,
       related,
       gallery,
       meta: {

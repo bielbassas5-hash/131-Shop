@@ -6,6 +6,7 @@ const { deleteImage, UserError } = require('../../lib/imageStorage');
 const { MAX_EXTRAS, extrasOf, validateFiles, saveMany, addExtras, removeExtras, removeAllExtras } = require('../../lib/productImages');
 const { wrap } = require('../../lib/security');
 const { validateProduct } = require('../../lib/validate');
+const { parseVariantsText, toText, variantsOf, replaceVariants } = require('../../lib/variants');
 const themesLib = require('../../lib/themes');
 const classify = require('../../lib/classify');
 const { uploadImages, pickFiles } = require('./shared');
@@ -47,8 +48,21 @@ async function applyThemes(product, body, { buffer } = {}) {
 const describeDetection = (d) =>
   d && d.names.length ? ` Temas detectados ${d.source === 'ai' ? 'con IA' : 'por palabras clave'}: ${d.names.join(', ')}.` : '';
 
+// Lee y valida el formulario de producto, incluidos los formatos ("A4: 18,00" por linea)
+function readProduct(body) {
+  const parsed = parseVariantsText(body.variants_text);
+  const v = validateProduct(body, { hasVariants: parsed.variants.length > 0 });
+  v.values.variants_text = typeof body.variants_text === 'string' ? body.variants_text.slice(0, 700) : '';
+  if (parsed.errors.length) {
+    v.errors.variants = parsed.errors.join(' ');
+    v.ok = false;
+  }
+  return { v, variants: parsed.variants };
+}
+
 async function renderForm(res, { product = null, form = null, errors = {}, error = null, status = 200 }) {
   const extras = product ? await extrasOf(product.id) : [];
+  const variantsText = form && form.variants_text !== undefined ? form.variants_text : product ? toText(await variantsOf(product.id)) : '';
   const allThemes = await themesLib.allThemes();
   const selectedThemeIds = form && form.themeIds ? form.themeIds : product ? (await themesLib.themesOf(product.id)).map((t) => Number(t.id)) : [];
   res.status(status).render('admin/product-form', {
@@ -57,6 +71,7 @@ async function renderForm(res, { product = null, form = null, errors = {}, error
     errors,
     error,
     extras,
+    variantsText,
     maxExtras: MAX_EXTRAS,
     allThemes,
     selectedThemeIds,
@@ -72,7 +87,7 @@ router.post(
   requireAdmin,
   uploadImages,
   wrap(async (req, res) => {
-    const v = validateProduct(req.body);
+    const { v, variants } = readProduct(req.body);
     const { cover, extras } = pickFiles(req);
     let error = req.uploadError || null;
     if (!cover && !error) error = 'Sube una imagen del producto.';
@@ -95,6 +110,7 @@ router.post(
       [v.values.title, v.values.description, v.price_cents, coverPath, v.values.type, v.stock]
     );
     await addExtras(created.lastInsertRowid, extraPaths);
+    if (variants.length) await replaceVariants(created.lastInsertRowid, variants);
     const detection = await applyThemes(
       { id: created.lastInsertRowid, title: v.values.title, description: v.values.description, image_path: coverPath },
       req.body,
@@ -128,7 +144,7 @@ router.post(
     const product = await findProduct(req);
     if (!product) return res.status(404).render('error', { status: 404 });
 
-    const v = validateProduct(req.body);
+    const { v, variants } = readProduct(req.body);
     const active = req.body.active === '1';
     const form = { ...v.values, active, ...themeForm(req.body) };
     const { cover, extras } = pickFiles(req);
@@ -168,6 +184,7 @@ router.post(
     if (coverPath) await deleteImage(product.image_path);
     await removeExtras(product.id, removeIds);
     await addExtras(product.id, extraPaths);
+    await replaceVariants(product.id, variants); // sin formatos: los borra y deja el precio indicado
     const detection = await applyThemes(
       { id: product.id, title: v.values.title, description: v.values.description, image_path },
       req.body,
@@ -185,6 +202,7 @@ router.post(
     const product = await findProduct(req);
     if (product) {
       await removeAllExtras(product.id);
+      await db.run('DELETE FROM product_variants WHERE product_id = ?', [product.id]);
       await db.run('DELETE FROM products WHERE id = ?', [product.id]);
       await deleteImage(product.image_path);
       req.session.flash = { type: 'success', msg: `"${product.title}" eliminado.` };

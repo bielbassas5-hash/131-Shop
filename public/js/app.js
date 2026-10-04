@@ -72,6 +72,17 @@
     update();
   }
 
+  // Ficha de producto: el precio mostrado sigue al formato elegido
+  var priceEl = document.getElementById('product-price');
+  var variantRadios = document.querySelectorAll('input[name="variant"][data-price-label]');
+  if (priceEl && variantRadios.length) {
+    variantRadios.forEach(function (r) {
+      r.addEventListener('change', function () {
+        if (r.checked) priceEl.textContent = r.getAttribute('data-price-label');
+      });
+    });
+  }
+
   // Cambio de tema claro / oscuro (se recuerda en este navegador)
   var themeBtn = document.querySelector('[data-theme-toggle]');
   if (themeBtn) {

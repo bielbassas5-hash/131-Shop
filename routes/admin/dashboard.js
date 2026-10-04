@@ -33,7 +33,9 @@ router.get(
   '/admin',
   requireAdmin,
   wrap(async (req, res) => {
-    const products = await db.all('SELECT * FROM products ORDER BY created_at DESC');
+    const products = await db.all(
+      'SELECT p.*, (SELECT COUNT(*) FROM product_variants v WHERE v.product_id = p.id) AS variant_count FROM products p ORDER BY p.created_at DESC'
+    );
     const counts = await db.all('SELECT status, COUNT(*) AS n FROM orders GROUP BY status');
     const revenue = await db.get(
       "SELECT COALESCE(SUM(total_cents), 0) AS total FROM orders WHERE status IN ('paid', 'production', 'shipped')"
@@ -57,7 +59,7 @@ router.get(
 );
 
 // Copia de seguridad completa: catalogo, temas y pedidos (contiene datos personales: guardala en sitio seguro)
-const BACKUP_TABLES = ['products', 'product_images', 'themes', 'product_themes', 'orders', 'order_items', 'order_events'];
+const BACKUP_TABLES = ['products', 'product_images', 'product_variants', 'themes', 'product_themes', 'orders', 'order_items', 'order_events'];
 
 router.get(
   '/admin/copia-seguridad.json',

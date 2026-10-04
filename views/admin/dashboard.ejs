@@ -57,7 +57,7 @@
             <td><% if (p.image_path) { %><img class="thumb-sm" src="<%= thumb(p.image_path, 120) %>" alt="" width="52" height="52" /><% } %></td>
             <td><a class="link" href="/producto/<%= p.id %>"><%= p.title %></a></td>
             <td><%= TYPE_LABELS[p.type] || p.type %></td>
-            <td><%= euro(p.price_cents) %></td>
+            <td><%= Number(p.variant_count) > 0 ? 'Desde ' : '' %><%= euro(p.price_cents) %></td>
             <% if (shop.trackStock) { %><td><%= p.stock %><% if (p.active && p.stock <= 0) { %> <span class="badge cancelled">Agotado</span><% } %></td><% } %>
             <td><span class="badge <%= p.active ? 'paid' : 'hidden' %>"><%= p.active ? 'Visible' : 'Oculto' %></span></td>
             <td>

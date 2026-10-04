@@ -34,7 +34,7 @@
   <div class="row2">
     <div class="field">
       <label for="price">Precio (EUR)</label>
-      <input id="price" type="text" inputmode="decimal" name="price" value="<%= f.price %>" placeholder="4,50" required />
+      <input id="price" type="text" inputmode="decimal" name="price" value="<%= f.price %>" placeholder="4,50" />
       <%- err('price') %>
     </div>
     <div class="field">
@@ -44,6 +44,12 @@
       <%- err('stock') %>
       <% } %>
     </div>
+  </div>
+  <div class="field">
+    <label for="variants_text">Formatos con precio propio (opcional)</label>
+    <textarea id="variants_text" name="variants_text" class="short" maxlength="700" placeholder="A4: 18,00&#10;A3: 28,00"><%= variantsText %></textarea>
+    <p class="field-hint">Una línea por formato, con el nombre y el precio separados por dos puntos. Si los rellenas, el cliente elige formato y el precio base pasa a ser el más barato (no hace falta el campo "Precio"). Máximo 8.</p>
+    <%- err('variants') %>
   </div>
   <div class="field">
     <label for="type">Tipo</label>

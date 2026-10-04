@@ -61,6 +61,13 @@ Al subir un producto, si no eliges ningún tema y dejas marcada la casilla, se d
 
 "Clasificar productos sin tema" (Panel → Temas) procesa los pendientes por lotes. La respuesta del modelo se sanea siempre: solo se aceptan nombres de 2-30 letras/números.
 
+### Formatos con precio propio
+
+Un producto puede tener hasta 8 formatos (por ejemplo un print en A4 y en A3), cada uno con su precio. En el formulario del producto se escribe una línea por formato, con el nombre y el precio separados por dos puntos:
+
+\
+Si se rellenan, el cliente elige formato en la ficha, el listado muestra "Desde 18,00 €" y el carrito y el pedido guardan el formato elegido ("Ojo de tigre · A3") con su precio, que siempre se recalcula en el servidor. Si quitas los formatos, el producto vuelve a su precio normal y los carritos que tuvieran un formato retirado se limpian solos.
+
 ### Producción bajo demanda
 
 No hay unidades ni "agotado". El límite es de 10 por línea de pedido. La ficha, el carrito y las condiciones indican que se elabora bajo pedido (y el `LEAD_TIME` si lo defines). El estado **En producción** informa al cliente de que su pedido se está elaborando. Si algún día necesitas stock, `TRACK_STOCK=1` lo reactiva (reserva al pedir, devolución al cancelar).

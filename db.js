@@ -99,6 +99,14 @@ async function migrate() {
       position INTEGER NOT NULL DEFAULT 0
     );
 
+    CREATE TABLE IF NOT EXISTS product_variants (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+      label TEXT NOT NULL,
+      price_cents INTEGER NOT NULL,
+      position INTEGER NOT NULL DEFAULT 0
+    );
+
     CREATE TABLE IF NOT EXISTS themes (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
@@ -152,6 +160,7 @@ async function migrate() {
     CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status, created_at);
     CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);
     CREATE INDEX IF NOT EXISTS idx_product_images_product ON product_images(product_id, position);
+    CREATE INDEX IF NOT EXISTS idx_product_variants_product ON product_variants(product_id, position);
     CREATE INDEX IF NOT EXISTS idx_products_active ON products(active, created_at);
     CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires);
     CREATE INDEX IF NOT EXISTS idx_order_events_order ON order_events(order_id, id);

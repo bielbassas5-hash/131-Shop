@@ -8,7 +8,15 @@
     description: product.description || product.title,
     image: gallery.map((g) => (/^https?:/.test(g) ? g : shop.siteUrl + g)),
     brand: { '@type': 'Brand', name: artistName },
-    offers: {
+    offers: variants.length > 1 ? {
+      '@type': 'AggregateOffer',
+      priceCurrency: 'EUR',
+      lowPrice: (Math.min(...variants.map((v) => v.price_cents)) / 100).toFixed(2),
+      highPrice: (Math.max(...variants.map((v) => v.price_cents)) / 100).toFixed(2),
+      offerCount: variants.length,
+      availability: soldOut ? 'https://schema.org/OutOfStock' : 'https://schema.org/InStock',
+      url: shop.siteUrl + productUrl(product)
+    } : {
       '@type': 'Offer',
       priceCurrency: 'EUR',
       price: (product.price_cents / 100).toFixed(2),
@@ -53,7 +61,7 @@
         <% productThemes.forEach((t) => { %><li><a href="/tema/<%= t.slug %>"><%= t.name %></a></li><% }) %>
       </ul>
     <% } %>
-    <span class="price"><%= euro(product.price_cents) %></span>
+    <span class="price" id="product-price"><%= euro(variants.length ? variants[0].price_cents : product.price_cents) %></span>
     <% if (product.description) { %><p class="desc"><%= product.description %></p><% } %>
 
     <div class="buy-box">
@@ -61,6 +69,17 @@
         <form method="POST" action="/agregar/<%= product.id %>">
           <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
           <input type="hidden" name="back" value="<%= productUrl(product) %>" />
+          <% if (variants.length) { %>
+            <fieldset class="variants">
+              <legend>Formato</legend>
+              <% variants.forEach((v, idx) => { %>
+                <label class="variant-opt">
+                  <input type="radio" name="variant" value="<%= v.id %>" data-price-label="<%= euro(v.price_cents) %>"<%= idx === 0 ? ' checked' : '' %> required />
+                  <span><%= v.label %> <small><%= euro(v.price_cents) %></small></span>
+                </label>
+              <% }) %>
+            </fieldset>
+          <% } %>
           <button class="btn block" type="submit">Añadir al carrito</button>
         </form>
         <% if (shop.trackStock && product.stock <= 3) { %><p class="stock-note">Solo quedan <%= product.stock %> unidades.</p><% } %>

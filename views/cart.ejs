@@ -14,21 +14,21 @@
       <% cart.items.forEach((i) => { const max = shop.trackStock ? Math.min(i.stock, 10) : 10; %>
         <div class="cart-line">
           <a href="<%= productUrl(i) %>">
-            <% if (i.image_path) { %><img src="<%= thumb(i.image_path, 200) %>" alt="<%= i.title %>" width="84" height="84" /><% } %>
+            <% if (i.image_path) { %><img src="<%= thumb(i.image_path, 200) %>" alt="<%= i.display %>" width="84" height="84" /><% } %>
           </a>
           <div>
-            <h3><a href="<%= productUrl(i) %>"><%= i.title %></a></h3>
+            <h3><a href="<%= productUrl(i) %>"><%= i.display %></a></h3>
             <small><%= euro(i.price_cents) %> &middot; <%= TYPE_LABELS[i.type] || i.type %></small>
             <div class="controls">
-              <form method="POST" action="/actualizar/<%= i.id %>">
+              <form method="POST" action="/actualizar/<%= i.key %>">
                 <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
-                <label class="sr-only" for="qty-<%= i.id %>">Cantidad de <%= i.title %></label>
-                <select id="qty-<%= i.id %>" name="quantity" data-autosubmit>
+                <label class="sr-only" for="qty-<%= i.key %>">Cantidad de <%= i.display %></label>
+                <select id="qty-<%= i.key %>" name="quantity" data-autosubmit>
                   <% for (let n = 1; n <= max; n++) { %><option value="<%= n %>"<%= n === i.quantity ? ' selected' : '' %>><%= n %></option><% } %>
                 </select>
                 <noscript><button class="btn small secondary" type="submit">Actualizar</button></noscript>
               </form>
-              <form method="POST" action="/quitar/<%= i.id %>">
+              <form method="POST" action="/quitar/<%= i.key %>">
                 <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
                 <button class="btn small danger" type="submit">Quitar</button>
               </form>

@@ -711,7 +711,7 @@ async function main() {
     const backup = await admin.get('/admin/copia-seguridad.json');
     let backupData = {};
     try { backupData = JSON.parse(backup.text); } catch (_) { /* se comprueba abajo */ }
-    check('copia de seguridad JSON descargable', backup.status === 200 && /attachment/.test(backup.headers.get('content-disposition') || '') && Array.isArray(backupData.orders) && backupData.orders.length >= 1 && Array.isArray(backupData.themes));
+    check('copia de seguridad JSON descargable', backup.status === 200 && /attachment/.test(backup.headers.get('content-disposition') || '') && Array.isArray(backupData.orders) && backupData.orders.length >= 1 && Array.isArray(backupData.themes) && Array.isArray(backupData.product_variants));
     check('copia de seguridad solo para el administrador', (await anon.get('/admin/copia-seguridad.json')).location === '/admin/login');
     const dashHtml = (await admin.get('/admin')).text;
     check('tarjetas del panel enlazan a los pedidos', dashHtml.includes('href="/admin/pedidos?estado=pending"') && dashHtml.includes('href="/admin/pedidos?estado=paid"'));
@@ -797,6 +797,76 @@ async function main() {
     })).status === 302);
 
     check('eliminar producto borra portada y extras', (await admin.post(`/admin/productos/${galId}/eliminar`, { _csrf: tok })).status === 302 && countUploads() === baseline);
+
+    console.log('\n# Formatos con precio propio');
+    const vfields = { title: 'Print formatos', description: 'Lamina', type: 'print', stock: '5', price: '' };
+    const vcreate = (extra, fields = vfields) =>
+      admin.req('POST', `/admin/productos/nuevo?_csrf=${tok}`, { multipart: productForm({ ...fields, ...extra }, png(0)) });
+    check('formato mal escrito rechazado', (await vcreate({ variants_text: 'A4 18' })).status === 400);
+    check('precio de formato invalido rechazado', (await vcreate({ variants_text: 'A4: 0' })).status === 400);
+    check('formato repetido rechazado', (await vcreate({ variants_text: 'A4: 10\na4: 12' })).status === 400);
+    check('mas de 8 formatos rechazado', (await vcreate({ variants_text: Array.from({ length: 9 }, (_, i) => `F${i}: ${i + 1}`).join('\n') })).status === 400);
+    check('sin precio ni formatos -> error', (await vcreate({ variants_text: '' })).status === 400);
+    check('producto con 3 formatos creado sin precio base', (await vcreate({ variants_text: 'A4: 18,00\nA3: 28\nA2: 40' })).status === 302);
+    await vcreate({ title: 'Otro formatos', variants_text: 'S: 5\nM: 6' });
+
+    const vlist = (await anon.get('/?q=formatos')).text;
+    check('el listado muestra "Desde" el formato mas barato', /Desde\s*18,00/.test(vlist));
+    const vId = vlist.match(/\/producto\/(\d+)-print-formatos/)[1];
+    const vpage = (await anon.get(`/producto/${vId}`)).text;
+    const vOptions = [...vpage.matchAll(/name="variant" value="(\d+)"/g)].map((m) => m[1]);
+    check('la ficha ofrece los 3 formatos con su precio', vOptions.length === 3 && vpage.includes('A3') && /data-price-label="40,00\s€"/.test(vpage));
+    check('la ficha parte del formato mas barato', /id="product-price">18,00\s€/.test(vpage) && /AggregateOffer/.test(vpage));
+    const otherId = (await anon.get('/?q=Otro')).text.match(/\/producto\/(\d+)-otro-formatos/)[1];
+    const otherVariants = [...(await anon.get(`/producto/${otherId}`)).text.matchAll(/name="variant" value="(\d+)"/g)].map((m) => m[1]);
+
+    const vb = new Client();
+    const vbt = await vb.csrf(`/producto/${vId}`);
+    const addV = (variant) => vb.post(`/agregar/${vId}`, { _csrf: vbt, back: '/', ...(variant ? { variant } : {}) });
+    await addV(null);
+    check('sin elegir formato no se anade', (await vb.get('/carrito')).text.includes('vacío'));
+    await addV('99999');
+    check('formato inexistente rechazado', (await vb.get('/carrito')).text.includes('vacío'));
+    await addV(otherVariants[0]);
+    check('formato de OTRO producto rechazado', (await vb.get('/carrito')).text.includes('vacío'));
+    await addV(vOptions[1]);
+    await addV(vOptions[0]);
+    await addV(vOptions[0]);
+    const vcart = (await vb.get('/carrito')).text;
+    check('el carrito muestra cada formato en su linea', vcart.includes('Print formatos · A3') && vcart.includes('Print formatos · A4'));
+    check('el precio de cada formato se aplica (2 x 18 + 28 + envio = 67,50)', /67,50/.test(vcart));
+    await vb.post(`/actualizar/${vId}:${vOptions[1]}`, { _csrf: vbt, quantity: '3' });
+    check('cambiar la cantidad de un formato (3 x 28 + 36 = 120, envio gratis)', /120,00/.test((await vb.get('/carrito')).text));
+    await vb.post(`/quitar/${vId}:${vOptions[1]}`, { _csrf: vbt });
+    const vcart2 = (await vb.get('/carrito')).text;
+    check('quitar un formato deja el otro (36 + envio = 39,50)', !vcart2.includes('· A3') && vcart2.includes('· A4') && /39,50/.test(vcart2));
+    check('claves de linea manipuladas se ignoran', (await vb.post('/quitar/1:2:3', { _csrf: vbt })).status === 302 && (await vb.get('/carrito')).text.includes('· A4'));
+
+    // Un cliente deja un formato en el carrito y luego se retira ese formato del producto
+    const vc = new Client();
+    const vct = await vc.csrf(`/producto/${vId}`);
+    await vc.post(`/agregar/${vId}`, { _csrf: vct, back: '/', variant: vOptions[2] });
+    check('cliente con el formato A2 en el carrito', (await vc.get('/carrito')).text.includes('· A2'));
+
+    const vco = await vb.csrf('/checkout');
+    const vorder = await vb.post('/checkout/crear', { _csrf: vco, name: 'Eva Formatos', email: 'eva.f@example.com', address: 'Calle 1', city: 'Madrid', postal_code: '28001', country: 'ES', accept: '1' });
+    check('pedido con formatos creado', vorder.status === 302 && /^\/pedido\//.test(vorder.location || ''), vorder.location);
+    const vorderPage = (await vb.get(vorder.location)).text;
+    check('el pedido guarda el formato y el precio (2 x 18 + envio = 39,50)', vorderPage.includes('Print formatos · A4') && /39,50/.test(vorderPage));
+    const vOrderId = vorderPage.match(/Pedido #(\d+)/)[1];
+    check('el panel muestra el formato en el pedido', (await admin.get(`/admin/pedidos/${vOrderId}`)).text.includes('Print formatos · A4'));
+
+    // Edicion: el administrador cambia los formatos y luego los quita
+    const vedit = (fields) => admin.req('POST', `/admin/productos/${vId}/editar?_csrf=${tok}`, { multipart: productForm({ title: 'Print formatos', description: 'Lamina', type: 'print', stock: '5', active: '1', price: '', ...fields }) });
+    check('editar formatos', (await vedit({ variants_text: 'A4: 20\nA3: 30' })).status === 302 && /Desde\s*20,00/.test((await anon.get('/?q=formatos')).text));
+    check('el formulario de edicion muestra los formatos guardados', /A4: 20,00\nA3: 30,00/.test((await admin.get(`/admin/productos/${vId}/editar`)).text));
+    check('quitar todos los formatos exige un precio', (await vedit({ variants_text: '' })).status === 400);
+    check('quitar los formatos con precio normal', (await vedit({ variants_text: '', price: '25' })).status === 302);
+    const afterRemove = (await anon.get(`/producto/${vId}`)).text;
+    check('sin formatos vuelve el precio normal', !/name="variant"/.test(afterRemove) && /id="product-price">25,00\s€/.test(afterRemove) && !/Desde/.test((await anon.get('/?q=Print+formatos')).text.split('Otro formatos')[0].split('Print formatos')[1] || ''));
+    const vcAfter = await vc.get('/carrito');
+    check('el carrito con un formato retirado se limpia solo', vcAfter.text.includes('vacío') && vcAfter.text.includes('ajustado'));
+    check('eliminar un producto con formatos', (await admin.post(`/admin/productos/${otherId}/eliminar`, { _csrf: tok })).status === 302 && (await anon.get(`/producto/${otherId}`)).status === 404);
 
     console.log('\n# Temas');
     const formPage = (await admin.get('/admin/productos/nuevo')).text;

@@ -13,6 +13,6 @@
   <div class="card-body">
     <span class="tag"><%= TYPE_LABELS[p.type] || p.type %></span>
     <h3><%= p.title %></h3>
-    <div class="card-foot"><span class="price"><%= euro(p.price_cents) %></span></div>
+    <div class="card-foot"><span class="price"><%= p.variant_count > 0 ? 'Desde ' : '' %><%= euro(p.price_cents) %></span></div>
   </div>
 </a>
