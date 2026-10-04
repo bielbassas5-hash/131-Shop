@@ -5,17 +5,21 @@ services:
     plan: free
     buildCommand: npm install
     startCommand: npm start
+    healthCheckPath: /healthz
     envVars:
       - key: SESSION_SECRET
         generateValue: true
+      - key: SHIPPING_COST_CENTS
+        value: "350"
+      - key: SHIPPING_COUNTRIES
+        value: ES
+      # Secretos y datos propios: se rellenan en el panel de Render
       - key: ADMIN_PASSWORD
-        sync: false
-      - key: BANK_IBAN
         sync: false
       - key: BIZUM_PHONE
         sync: false
-      - key: SHIPPING_COST_CENTS
-        value: "350"
+      - key: BANK_IBAN
+        sync: false
       - key: TURSO_DATABASE_URL
         sync: false
       - key: TURSO_AUTH_TOKEN
@@ -26,7 +30,23 @@ services:
         sync: false
       - key: CLOUDINARY_API_SECRET
         sync: false
+      - key: SITE_URL
+        sync: false
+      - key: CONTACT_EMAIL
+        sync: false
+      - key: LEGAL_NAME
+        sync: false
+      - key: LEGAL_NIF
+        sync: false
+      - key: LEGAL_ADDRESS
+        sync: false
+      - key: OWNER_EMAIL
+        sync: false
+      - key: BREVO_API_KEY
+        sync: false
+      - key: MAIL_FROM
+        sync: false
       - key: STRIPE_SECRET_KEY
         sync: false
-      - key: STRIPE_PUBLISHABLE_KEY
+      - key: STRIPE_WEBHOOK_SECRET
         sync: false

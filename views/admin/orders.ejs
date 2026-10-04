@@ -28,7 +28,7 @@
             <td><%= o.customer_name %><br /><small><%= o.customer_email %></small></td>
             <td><%= euro(o.total_cents) %></td>
             <td><span class="badge <%= o.status %>"><%= STATUS_LABELS[o.status] || o.status %></span></td>
-            <td><small><%= o.created_at %></small></td>
+            <td><small><%= dateTime(o.created_at) %></small></td>
             <td><a class="btn small secondary" href="/admin/pedidos/<%= o.id %>">Ver</a></td>
           </tr>
         <% }) %>

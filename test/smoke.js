@@ -247,6 +247,8 @@ async function suiteProdAndMigration() {
     INSERT INTO order_items (order_id, product_id, title, price_cents, quantity) VALUES (1, 1, 'Antiguo', 450, 1);
     INSERT INTO orders (customer_email, customer_name, shipping_address, total_cents, status) VALUES ('pend@example.com', 'Pendiente', '{"name":"Pendiente"}', 500, 'pending');
     INSERT INTO order_items (order_id, product_id, title, price_cents, quantity) VALUES (2, 1, 'Antiguo', 450, 1);
+    INSERT INTO orders (customer_email, customer_name, shipping_address, total_cents, status, created_at) VALUES ('viejo@example.com', 'Pedido Viejo', '{"name":"Pedido Viejo"}', 450, 'pending', '2020-01-01 10:00:00');
+    INSERT INTO order_items (order_id, product_id, title, price_cents, quantity) VALUES (3, 1, 'Antiguo', 450, 1);
   `);
   old.close();
 
@@ -288,6 +290,9 @@ async function suiteProdAndMigration() {
     check('IBAN de ejemplo nunca se muestra al cliente', !!pendToken && !pendPage.text.includes('ES00') && /Escríbenos/.test(pendPage.text));
     const dash = await admin.get('/admin', { headers: proxied });
     check('panel muestra la lista de puesta en marcha', dash.text.includes('Puesta en marcha') && dash.text.includes('LEGAL_NAME'));
+    const oldDetail = await admin.get('/admin/pedidos/3', { headers: proxied });
+    check('pedido pendiente antiguo caducado al arrancar', oldDetail.status === 200 && /badge cancelled/.test(oldDetail.text));
+    check('un pedido pendiente reciente no caduca', /badge pending/.test(pendDetail.text));
     check('sin errores en el log (produccion)', !/\[error\]|unhandledRejection|uncaughtException/.test(log3), log3.slice(-500));
   } finally {
     srv.kill();
@@ -378,7 +383,7 @@ async function main() {
     const xssTitle = '<script>alert(1)</script>Pegatina';
     const created = await up({ title: xssTitle, description: 'Desc <b>x</b>', price: '4,50', stock: '2', type: 'sticker' }, img);
     check('producto valido creado (coma decimal)', created.status === 302);
-    await up({ title: 'Print grande', description: '', price: '40', stock: '5', type: 'print' }, img);
+    await up({ title: 'Print grande', description: '', price: '40', stock: '30', type: 'print' }, img);
 
     const list = await anon.get('/');
     check('producto visible en portada', list.text.includes('Pegatina'));
@@ -460,6 +465,17 @@ async function main() {
     await shipc.post('/actualizar/2', { _csrf: sct, quantity: '3' });
     const freeCart = await shipc.get('/carrito');
     check('envio gratis al superar el umbral', /Gratis/.test(freeCart.text) && /120,00/.test(freeCart.text));
+
+    // Anti-abuso de correo: un mismo destinatario recibe como maximo 4 emails por hora
+    const spam = new Client();
+    const spt = await spam.csrf('/producto/2');
+    for (let i = 0; i < 6; i++) {
+      await spam.post('/agregar/2', { _csrf: spt, back: '/' });
+      await spam.post('/checkout/crear', { _csrf: spt, name: 'Victima Test', email: 'victima@example.com', phone: '600999888', method: 'pickup', accept: '1' });
+    }
+    await sleep(800);
+    check('limite de emails por destinatario (max 4/hora)', mailTo('victima@example.com', /Hemos recibido/).length === 4, String(mailTo('victima@example.com', /Hemos recibido/).length));
+    check('el propietario sigue recibiendo avisos', mailTo('owner@example.com', /Nuevo pedido/).length >= 6);
 
     console.log('\n# Gestion de pedidos (admin)');
     tok = await admin.csrf('/admin');

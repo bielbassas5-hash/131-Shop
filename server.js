@@ -9,7 +9,7 @@ const compression = require('compression');
 const db = require('./db');
 const DbStore = require('./lib/sessionStore');
 const { csrf } = require('./lib/security');
-const { euro, thumb, TYPE_LABELS, TYPE_PLURALS, STATUS_LABELS } = require('./lib/format');
+const { euro, dateTime, thumb, TYPE_LABELS, TYPE_PLURALS, STATUS_LABELS } = require('./lib/format');
 const { shippingCost, freeShippingThreshold, expirePending } = require('./lib/orders');
 
 const storeRoutes = require('./routes/store');
@@ -90,6 +90,7 @@ app.use((req, res, next) => {
   res.locals.cartCount = Object.values(cart).reduce((a, b) => a + (parseInt(b, 10) || 0), 0);
   res.locals.artistName = '131';
   res.locals.euro = euro;
+  res.locals.dateTime = dateTime;
   res.locals.thumb = thumb;
   res.locals.TYPE_LABELS = TYPE_LABELS;
   res.locals.TYPE_PLURALS = TYPE_PLURALS;

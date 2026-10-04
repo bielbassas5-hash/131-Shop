@@ -29,7 +29,7 @@
         <dt>País</dt><dd><%= shipTo.country %></dd>
         <% } %>
         <% if (shipTo.notes) { %><dt>Notas</dt><dd style="white-space:pre-line"><%= shipTo.notes %></dd><% } %>
-        <dt>Recibido</dt><dd><%= order.created_at %></dd>
+        <dt>Recibido</dt><dd><%= dateTime(order.created_at) %></dd>
       </dl>
     </section>
   </div>
