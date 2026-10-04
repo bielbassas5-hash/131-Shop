@@ -1074,6 +1074,39 @@ async function main() {
     const alerts = mailTo('owner@example.com', /Intentos fallidos de acceso/);
     check('aviso por email tras varios intentos fallidos (solo uno por hora)', alerts.length === 1 && /IP 127\.0\.0\.1|IP ::1|IP ::ffff:127\.0\.0\.1/.test(alerts[0].textContent), String(alerts.length));
 
+    console.log('\n# Ficha tecnica, referencia, compartir y paginas informativas');
+    const dfields = { title: 'Obra con ficha', description: 'Texto', type: 'print', stock: '5', price: '12' };
+    const dcreate = (extra) => admin.req('POST', `/admin/productos/nuevo?_csrf=${tok}`, { multipart: productForm({ ...dfields, ...extra }, png(0)) });
+    check('detalle sin dos puntos rechazado', (await dcreate({ details: 'sin formato' })).status === 400);
+    check('mas de 8 detalles rechazado', (await dcreate({ details: Array.from({ length: 9 }, (_, i) => `D${i}: v`).join('\n') })).status === 400);
+    check('ficha tecnica valida creada', (await dcreate({ details: 'Técnica: tinta y acuarela\nPapel: 250 g/m²\n<b>Edición</b>: abierta' })).status === 302);
+    const dId = (await anon.get('/?q=Obra%20con%20ficha')).text.match(/\/producto\/(\d+)-obra-con-ficha/)[1];
+    const dpage = (await anon.get(`/producto/${dId}`)).text;
+    check('la ficha muestra los detalles', /<dt>Técnica<\/dt>\s*<dd>tinta y acuarela<\/dd>/.test(dpage) && dpage.includes('250 g/m²'));
+    check('los detalles se escapan (sin HTML)', !dpage.includes('<b>Edición</b>') && dpage.includes('&lt;b&gt;Edición'));
+    check('la ficha muestra la referencia y los botones de compartir', dpage.includes(`Ref. 131-${String(dId).padStart(4, '0')}`) && dpage.includes('wa.me/?text=') && /data-copy="[^"]*\/producto\/\d+-obra-con-ficha"/.test(dpage));
+    check('el enlace de WhatsApp lleva el texto codificado', /wa\.me\/\?text=Obra%20con%20ficha%20/.test(dpage));
+    check('JSON-LD incluye la referencia', dpage.includes('"sku":"131-'));
+    const dedit = (await admin.get(`/admin/productos/${dId}/editar`)).text;
+    check('el formulario recuerda la ficha tecnica', /<textarea[^>]*id="details"[^>]*>Técnica: tinta y acuarela/.test(dedit));
+    check('editar sin ficha la elimina', (await admin.req('POST', `/admin/productos/${dId}/editar?_csrf=${tok}`, { multipart: productForm({ ...dfields, active: '1', details: '' }) })).status === 302 && !/class="specs"/.test((await anon.get(`/producto/${dId}`)).text));
+
+    const faq = await anon.get('/preguntas-frecuentes');
+    check('FAQ responde 200 con las preguntas', faq.status === 200 && faq.text.includes('<details>') && faq.text.includes('¿Cuánto cuesta el envío'));
+    check('FAQ usa el coste de envio real', /3,50\s€/.test(faq.text));
+    check('FAQ no promete tarjeta sin Stripe', !/tarjeta/.test(faq.text));
+    const contacto = await anon.get('/contacto');
+    check('contacto responde 200', contacto.status === 200 && contacto.text.includes('<h1>Contacto</h1>'));
+    check('sin texto "Sobre mi" la pagina no existe ni se enlaza', (await anon.get('/sobre-mi')).status === 404 && !(await anon.get('/')).text.includes('/sobre-mi') && !(await anon.get('/sitemap.xml')).text.includes('/sobre-mi'));
+    check('el panel de "Sobre mi" exige sesion', (await anon.get('/admin/sobre-mi')).status === 302);
+    check('guardar "Sobre mi" exige CSRF', (await admin.post('/admin/sobre-mi', { about: 'x' })).status === 403);
+    check('guardar "Sobre mi"', (await admin.post('/admin/sobre-mi', { _csrf: tok, about: 'Soy 131.\n\nDibujo <script>alert(1)</script> a mano.' })).status === 302);
+    const about = await anon.get('/sobre-mi');
+    check('"Sobre mi" se muestra en parrafos y escapado', about.status === 200 && about.text.includes('<p>Soy 131.</p>') && !about.text.includes('<script>alert(1)') && about.text.includes('&lt;script&gt;'));
+    check('aparece enlazada en el pie y en el sitemap', (await anon.get('/')).text.includes('href="/sobre-mi"') && (await anon.get('/sitemap.xml')).text.includes('/sobre-mi'));
+    check('vaciar el texto oculta la pagina', (await admin.post('/admin/sobre-mi', { _csrf: tok, about: '' })).status === 302 && (await anon.get('/sobre-mi')).status === 404);
+    check('FAQ y contacto estan en el sitemap', (await anon.get('/sitemap.xml')).text.includes('/preguntas-frecuentes'));
+
     check('sin errores no controlados en el log', !/\[error\]|unhandledRejection|uncaughtException/.test(serverLog), serverLog.slice(-600));
 
     await suiteStripe();

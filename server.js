@@ -10,6 +10,7 @@ const db = require('./db');
 const DbStore = require('./lib/sessionStore');
 const { csrf, createLimiter, clientIp } = require('./lib/security');
 const { euro, dateTime, thumb, TYPE_LABELS, TYPE_PLURALS, STATUS_LABELS } = require('./lib/format');
+const siteSettings = require('./lib/siteSettings');
 const { shippingCost, freeShippingThreshold, expirePending, trackStock } = require('./lib/orders');
 
 const storeRoutes = require('./routes/store');
@@ -118,6 +119,7 @@ app.use((req, res, next) => {
   res.locals.assetVersion = assetVersion;
   res.locals.currentPath = req.path;
   res.locals.meta = {};
+  res.locals.hasAbout = !!siteSettings.getAbout();
   res.locals.isAdmin = !!(req.session && req.session.isAdmin);
   res.locals.shop = {
     shippingCents: shippingCost(),
@@ -183,6 +185,7 @@ process.on('uncaughtException', (err) => console.error('[uncaughtException]', er
 
 db.migrate()
   .then(async () => {
+    await siteSettings.load();
     const released = await expirePending(PENDING_EXPIRY_DAYS).catch((e) => {
       console.error('No se pudieron caducar pedidos pendientes:', e.message);
       return 0;

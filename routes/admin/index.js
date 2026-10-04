@@ -9,6 +9,7 @@ router.use(require('./auth'));
 router.use(require('./dashboard'));
 router.use(require('./products'));
 router.use(require('./themes'));
+router.use(require('./about'));
 router.use(require('./orders'));
 
 module.exports = router;

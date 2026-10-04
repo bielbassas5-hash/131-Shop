@@ -1,0 +1,15 @@
+<%- include('partials/header') %>
+<article class="prose">
+  <h1>Contacto</h1>
+  <% if (shop.contactEmail || shop.instagram) { %>
+    <ul class="contact-list">
+      <% if (shop.contactEmail) { %><li><b>Email:</b> <a class="link" href="mailto:<%= shop.contactEmail %>"><%= shop.contactEmail %></a></li><% } %>
+      <% if (shop.instagram) { %><li><b>Instagram:</b> <a class="link" href="https://instagram.com/<%= shop.instagram %>" rel="noopener noreferrer" target="_blank">@<%= shop.instagram %></a></li><% } %>
+    </ul>
+    <p>Si escribes por un pedido, indica el número de pedido.</p>
+  <% } else { %>
+    <p>Los datos de contacto estarán disponibles próximamente.</p>
+  <% } %>
+  <p>Puedes ver el estado de tu pedido en <a class="link" href="/pedido">Consultar mi pedido</a> y resolver dudas habituales en las <a class="link" href="/preguntas-frecuentes">preguntas frecuentes</a>.</p>
+</article>
+<%- include('partials/footer') %>

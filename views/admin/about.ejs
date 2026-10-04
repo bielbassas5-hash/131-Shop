@@ -1,0 +1,19 @@
+<%- include('../partials/header') %>
+
+<div class="admin-top">
+  <h1>Sobre mí</h1>
+  <a class="btn ghost" href="/admin">Volver</a>
+</div>
+
+<form class="panel form-card" method="POST" action="/admin/sobre-mi">
+  <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+  <div class="field">
+    <label for="about">Texto de la página</label>
+    <textarea id="about" name="about" maxlength="<%= max %>" rows="10"><%= about %></textarea>
+    <p class="field-hint">Separa los párrafos con una línea en blanco. Si lo dejas vacío, la página no se muestra y el enlace desaparece del pie. Máximo <%= max %> caracteres.</p>
+  </div>
+  <button class="btn block" type="submit">Guardar</button>
+  <% if (about) { %><p class="field-hint"><a class="link" href="/sobre-mi" target="_blank" rel="noopener">Ver la página</a></p><% } %>
+</form>
+
+<%- include('../partials/footer') %>

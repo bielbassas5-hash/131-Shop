@@ -1,0 +1,13 @@
+<%- include('partials/header') %>
+<article class="prose">
+  <h1>Preguntas frecuentes</h1>
+  <div class="faq">
+    <% items.forEach((it) => { %>
+      <details>
+        <summary><%= it.q %></summary>
+        <p><%= it.a %><% if (it.link) { %> <a class="link" href="<%= it.link.href %>"><%= it.link.text %></a><% } %></p>
+      </details>
+    <% }) %>
+  </div>
+</article>
+<%- include('partials/footer') %>

@@ -7,6 +7,7 @@ const { MAX_EXTRAS, extrasOf, validateFiles, saveMany, addExtras, removeExtras, 
 const { wrap } = require('../../lib/security');
 const { validateProduct } = require('../../lib/validate');
 const { MAX_VARIANTS, parseVariantsText, toText, variantsOf, replaceVariants } = require('../../lib/variants');
+const { parseDetails, toText: toDetailsText, MAX_DETAILS } = require('../../lib/details');
 const formats = require('../../lib/formats');
 const themesLib = require('../../lib/themes');
 const classify = require('../../lib/classify');
@@ -83,6 +84,13 @@ function readProduct(body) {
   v.values.variants_text = typeof body.variants_text === 'string' ? body.variants_text.slice(0, 700) : '';
   v.values.fmt = chosen.filter((id) => formats.PRESETS.some((p) => p.id === id));
   v.values.fmt_prices = fmtPrices;
+  const det = parseDetails(body.details);
+  v.values.details = typeof body.details === 'string' ? body.details.slice(0, 1200) : '';
+  v.details_text = toDetailsText(det.details);
+  if (det.errors.length) {
+    v.errors.details = det.errors.join(' ');
+    v.ok = false;
+  }
   v.values.source_width = typeof body.source_width === 'string' ? body.source_width.trim().slice(0, 6) : '';
   v.values.source_height = typeof body.source_height === 'string' ? body.source_height.trim().slice(0, 6) : '';
   if (problems.length) {
@@ -168,6 +176,7 @@ async function renderForm(res, { product = null, form = null, errors = {}, error
     formatRows,
     dims,
     maxVariants: MAX_VARIANTS,
+    maxDetails: MAX_DETAILS,
     maxExtras: MAX_EXTRAS,
     allThemes,
     selectedThemeIds,
@@ -202,9 +211,9 @@ router.post(
 
     const dims = resolveDims(v.values, cover.buffer, null);
     const created = await db.run(
-      `INSERT INTO products (title, description, price_cents, image_path, type, stock, active, source_width, source_height)
-       VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)`,
-      [v.values.title, v.values.description, v.price_cents, coverPath, v.values.type, v.stock, dims ? dims.width : null, dims ? dims.height : null]
+      `INSERT INTO products (title, description, price_cents, image_path, type, stock, active, source_width, source_height, details)
+       VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
+      [v.values.title, v.values.description, v.price_cents, coverPath, v.values.type, v.stock, dims ? dims.width : null, dims ? dims.height : null, v.details_text]
     );
     await addExtras(created.lastInsertRowid, extraPaths);
     if (variants.length) await replaceVariants(created.lastInsertRowid, variants);
@@ -276,9 +285,9 @@ router.post(
     const dims = resolveDims(v.values, cover ? cover.buffer : null, product);
     await db.run(
       `UPDATE products SET title = ?, description = ?, price_cents = ?, image_path = ?, type = ?, stock = ?, active = ?,
-         source_width = ?, source_height = ?
+         source_width = ?, source_height = ?, details = ?
        WHERE id = ?`,
-      [v.values.title, v.values.description, v.price_cents, image_path, v.values.type, v.stock, active ? 1 : 0, dims ? dims.width : null, dims ? dims.height : null, product.id]
+      [v.values.title, v.values.description, v.price_cents, image_path, v.values.type, v.stock, active ? 1 : 0, dims ? dims.width : null, dims ? dims.height : null, v.details_text, product.id]
     );
     if (coverPath) await deleteImage(product.image_path);
     await removeExtras(product.id, removeIds);

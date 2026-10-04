@@ -6,6 +6,9 @@ const { extrasOf } = require('../lib/productImages');
 const { variantsOf } = require('../lib/variants');
 const themesLib = require('../lib/themes');
 const { trackStock } = require('../lib/orders');
+const { parseDetails, skuOf } = require('../lib/details');
+const { buildFaq } = require('../lib/faq');
+const siteSettings = require('../lib/siteSettings');
 const { slugOf } = db;
 
 const router = express.Router();
@@ -144,6 +147,8 @@ router.get(
       variants,
       related,
       gallery,
+      details: parseDetails(product.details || '').details,
+      sku: skuOf(product.id),
       meta: {
         title: product.title,
         description: (product.description || '').replace(/\s+/g, ' ').slice(0, 155) ||
@@ -155,6 +160,29 @@ router.get(
     });
   })
 );
+
+// ---- Paginas informativas ----
+router.get('/preguntas-frecuentes', (req, res) => {
+  res.render('faq', {
+    items: buildFaq(res.locals.shop),
+    meta: { title: 'Preguntas frecuentes', description: 'Envíos, plazos, formatos, pagos y devoluciones.' },
+  });
+});
+
+router.get('/contacto', (req, res) => {
+  res.render('contact', {
+    meta: { title: 'Contacto', description: 'Cómo ponerte en contacto con 131.' },
+  });
+});
+
+router.get('/sobre-mi', (req, res) => {
+  const about = siteSettings.getAbout();
+  if (!about) return res.status(404).render('error', { status: 404 });
+  res.render('about', {
+    paragraphs: about.split(/\n{2,}/).map((x) => x.trim()).filter(Boolean),
+    meta: { title: 'Sobre mí', description: about.replace(/\s+/g, ' ').slice(0, 155) },
+  });
+});
 
 // ---- Paginas legales ----
 const LEGAL = {
@@ -186,7 +214,8 @@ router.get(
     const base = siteUrl(req);
     const products = await db.all('SELECT id, title FROM products WHERE active = 1');
     const themes = await themesLib.publicThemes();
-    const urls = [`<url><loc>${base}/</loc></url>`, `<url><loc>${base}/temas</loc></url>`]
+    const urls = [`<url><loc>${base}/</loc></url>`, `<url><loc>${base}/temas</loc></url>`, `<url><loc>${base}/preguntas-frecuentes</loc></url>`, `<url><loc>${base}/contacto</loc></url>`]
+      .concat(siteSettings.getAbout() ? [`<url><loc>${base}/sobre-mi</loc></url>`] : [])
       .concat(themes.map((t) => `<url><loc>${base}/tema/${t.slug}</loc></url>`))
       .concat(products.map((p) => `<url><loc>${base}${res.locals.productUrl(p)}</loc></url>`));
     res

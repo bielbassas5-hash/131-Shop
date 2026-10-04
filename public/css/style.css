@@ -490,3 +490,21 @@ dialog.lightbox .lb-close { position: fixed; top: 14px; right: 14px; width: 44px
 .quality.q-aceptable { color: var(--warn); }
 .quality.q-baja { color: var(--danger); }
 @media (max-width: 560px) { .format-row { grid-template-columns: 1fr 110px; } .format-row .quality { grid-column: 1 / -1; } }
+
+/* ---- Ficha tecnica, compartir, preguntas frecuentes ---- */
+.specs { margin: 18px 0 0; display: grid; gap: 0; border-top: 1px solid var(--border); }
+.specs > div { display: flex; gap: 16px; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid var(--border); font-size: .92rem; }
+.specs dt { color: var(--muted); }
+.specs dd { margin: 0; text-align: right; color: var(--text); }
+.share { display: flex; flex-wrap: wrap; gap: 8px 18px; justify-content: space-between; align-items: center; margin-top: 16px; font-size: .85rem; color: var(--muted); }
+.share-links { display: flex; flex-wrap: wrap; gap: 4px 16px; }
+.link-btn { background: none; border: 0; padding: 0; font: inherit; color: var(--accent); font-weight: 500; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.link-btn:hover { color: var(--text); }
+.faq { display: grid; gap: 0; border-top: 1px solid var(--border); }
+.faq details { border-bottom: 1px solid var(--border); padding: 14px 0; }
+.faq summary { cursor: pointer; font-weight: 600; list-style: none; display: flex; justify-content: space-between; gap: 16px; }
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after { content: '+'; color: var(--muted); font-weight: 400; }
+.faq details[open] summary::after { content: '\2212'; }
+.faq details p { margin: 10px 0 0; }
+.contact-list { list-style: none; padding: 0; display: grid; gap: 8px; }

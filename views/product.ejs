@@ -7,6 +7,7 @@
     name: product.title,
     description: product.description || product.title,
     image: gallery.map((g) => (/^https?:/.test(g) ? g : shop.siteUrl + g)),
+    sku: sku,
     brand: { '@type': 'Brand', name: artistName },
     offers: variants.length > 1 ? {
       '@type': 'AggregateOffer',
@@ -63,6 +64,11 @@
     <% } %>
     <span class="price" id="product-price"><%= euro(variants.length ? variants[0].price_cents : product.price_cents) %></span>
     <% if (product.description) { %><p class="desc"><%= product.description %></p><% } %>
+    <% if (details.length) { %>
+      <dl class="specs" aria-label="Ficha técnica">
+        <% details.forEach((d) => { %><div><dt><%= d.label %></dt><dd><%= d.value %></dd></div><% }) %>
+      </dl>
+    <% } %>
 
     <div class="buy-box">
       <% if (!soldOut) { %>
@@ -92,6 +98,14 @@
         <% if (!shop.trackStock) { %><li>Se elabora bajo pedido<%= shop.leadTime ? ' · plazo de ' + shop.leadTime : '' %></li><% } %>
         <li><a class="link" href="/legal/condiciones">Devoluciones en 14 días</a></li>
       </ul>
+    </div>
+    <div class="share" aria-label="Compartir">
+      <span class="share-ref">Ref. <%= sku %></span>
+      <span class="share-links">
+        <button type="button" class="link-btn" data-copy="<%= shop.siteUrl + productUrl(product) %>">Copiar enlace</button>
+        <a class="link-btn" href="https://wa.me/?text=<%= encodeURIComponent(product.title + ' ' + shop.siteUrl + productUrl(product)) %>" target="_blank" rel="noopener noreferrer">WhatsApp</a>
+        <a class="link-btn" href="mailto:?subject=<%= encodeURIComponent(product.title) %>&amp;body=<%= encodeURIComponent(shop.siteUrl + productUrl(product)) %>">Email</a>
+      </span>
     </div>
   </div>
 </div>

@@ -3,6 +3,7 @@
   const f = form || (product ? {
     title: product.title,
     description: product.description || '',
+    details: product.details || '',
     price: (product.price_cents / 100).toFixed(2),
     stock: String(product.stock),
     type: product.type,
@@ -29,7 +30,12 @@
   <div class="field">
     <label for="description">Descripción</label>
     <textarea id="description" name="description" maxlength="1500"><%= f.description %></textarea>
-    <p class="field-hint">Cuenta la historia de la pieza, medidas, materiales, técnica...</p>
+  </div>
+  <div class="field">
+    <label for="details">Ficha técnica (opcional)</label>
+    <textarea id="details" name="details" class="short" maxlength="1200" placeholder="Técnica: tinta china y acuarela&#10;Papel: 250 g/m², mate&#10;Edición: abierta"><%= f.details || '' %></textarea>
+    <p class="field-hint">Una línea por dato, con el formato "Etiqueta: valor" (máximo <%= maxDetails %>). Aparece en la ficha del producto, bajo la descripción.</p>
+    <%- err('details') %>
   </div>
   <div class="row2">
     <div class="field">

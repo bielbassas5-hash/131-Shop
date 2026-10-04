@@ -146,6 +146,7 @@ async function migrate() {
   await ensureColumn('orders', 'admin_notes', 'TEXT');
   await ensureColumn('products', 'source_width', 'INTEGER');
   await ensureColumn('products', 'source_height', 'INTEGER');
+  await ensureColumn('products', 'details', 'TEXT');
   await ensureColumn('orders', 'shipping_method', "TEXT NOT NULL DEFAULT 'ship'");
   await client.execute(
     "UPDATE orders SET token = lower(hex(randomblob(16))) WHERE token IS NULL OR token = ''"

@@ -8,14 +8,14 @@ Tienda online para vender dibujos, prints y stickers hechos a mano. Node.js + Ex
 npm install
 cp .env.example .env     # y edita los valores
 npm run dev              # http://localhost:3001
-npm test                 # ~190 pruebas automáticas (seguridad, pedidos, pagos, emails, temas...)
+npm test                 # ~350 pruebas automáticas (seguridad, pedidos, pagos, emails, temas...)
 ```
 
 Sin `TURSO_*` ni `CLOUDINARY_*` usa un archivo SQLite local (`data/store.db`) y guarda las imágenes en `public/uploads`. Para rellenar la tienda local con productos de ejemplo: `node scripts/seed-demo.js` (con el servidor en marcha).
 
 ## Qué incluye
 
-**Tienda:** catálogo con filtros, búsqueda y orden · **temas** (montañas, retratos, animales…) con páginas propias y vista agrupada · ficha con galería de hasta 6 imágenes · producción **bajo demanda** (sin stock) con plazo de elaboración · envío fijo o gratis desde un importe · recogida en mano opcional · notas del pedido · seguimiento del pedido por enlace privado (y recuperable con número + email en `/pedido`) · páginas legales (privacidad, condiciones/devoluciones, aviso legal) · SEO (sitemap, Open Graph, datos estructurados).
+**Tienda:** catálogo con filtros, búsqueda y orden · **temas** (montañas, retratos, animales…) con páginas propias y vista agrupada · ficha con galería de hasta 6 imágenes · producción **bajo demanda** (sin stock) con plazo de elaboración · envío fijo o gratis desde un importe · recogida en mano opcional · notas del pedido · seguimiento del pedido por enlace privado (y recuperable con número + email en `/pedido`) · **ficha técnica** por obra (técnica, papel, edición…) y referencia · botones para compartir (copiar enlace, WhatsApp, email) · **preguntas frecuentes** y **contacto** generados con los datos reales de la tienda · página **Sobre mí** editable desde el panel · páginas legales (privacidad, condiciones/devoluciones, aviso legal) · SEO (sitemap, Open Graph, datos estructurados).
 
 **Panel (`/admin`):** estadísticas (las tarjetas llevan a los pedidos), buscador de pedidos, historial de estados con fechas, copia de seguridad en JSON, lista de puesta en marcha, productos (subir, editar, ocultar, borrar), gestión de temas, pedidos con filtros y estados (pendiente → pagado → en producción → enviado), número de seguimiento, exportación CSV y aviso al cliente por email.
 
@@ -76,6 +76,12 @@ A2: 45,00
 ```
 
 Si se rellenan, el cliente elige formato en la ficha, el listado muestra "Desde 18,00 €" y el carrito y el pedido guardan el formato elegido ("Ojo de tigre · A3") con su precio, que siempre se recalcula en el servidor. Si quitas los formatos, el producto vuelve a su precio normal y los carritos que tuvieran un formato retirado se limpian solos.
+
+### Ficha técnica y página "Sobre mí"
+
+En el formulario de producto, "Ficha técnica" admite hasta 8 líneas con el formato `Etiqueta: valor` (por ejemplo `Papel: 250 g/m²`). Se muestran como tabla bajo la descripción. Cada producto tiene una referencia automática (`131-0007`) que aparece en la ficha y en los datos estructurados.
+
+**Panel → Sobre mí** guarda el texto de esa página (párrafos separados por una línea en blanco). Si lo dejas vacío, la página y su enlace del pie no existen. Las preguntas frecuentes se construyen con la configuración real (envío, plazo, medios de pago, recogida), así que nunca prometen algo que la tienda no ofrece.
 
 ### Producción bajo demanda
 
