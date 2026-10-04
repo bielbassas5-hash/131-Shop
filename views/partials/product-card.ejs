@@ -1,5 +1,5 @@
 <% const soldOut = shop.trackStock && p.stock <= 0; const low = shop.trackStock && !soldOut && p.stock <= 2; %>
-<a class="card<%= soldOut ? ' soldout' : '' %>" href="/producto/<%= p.id %>">
+<a class="card<%= soldOut ? ' soldout' : '' %>" href="<%= productUrl(p) %>">
   <div class="card-media">
     <% if (p.image_path) { %>
       <img class="main<%= p.hover_image ? ' has-alt' : '' %>" src="<%= thumb(p.image_path, 600) %>" alt="<%= p.title %>" loading="lazy" decoding="async" width="600" height="600" />

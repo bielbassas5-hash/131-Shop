@@ -13,6 +13,12 @@ const { uploadImages, pickFiles } = require('./shared');
 const router = express.Router();
 
 // ---------- Productos ----------
+// Fallo del servicio de imagenes (red, Cloudinary...): se registra y el administrador ve un aviso claro
+function uploadFailure(err) {
+  console.error('[imagenes] no se pudo guardar la imagen:', err && err.message ? err.message : err);
+  return new UserError('No se ha podido subir la imagen. Inténtalo de nuevo en unos minutos.');
+}
+
 // ---- Temas en el formulario de producto ----
 const toIds = (v) =>
   []
@@ -78,8 +84,8 @@ router.post(
     try {
       validateFiles([cover, ...extras]);
       [coverPath, ...extraPaths] = await saveMany([cover, ...extras]);
-    } catch (err) {
-      if (!(err instanceof UserError)) throw err;
+    } catch (rawErr) {
+      const err = rawErr instanceof UserError ? rawErr : uploadFailure(rawErr);
       return renderForm(res, { form: { ...v.values, ...themeForm(req.body) }, errors: v.errors, error: err.message, status: 400 });
     }
 
@@ -148,8 +154,8 @@ router.post(
       const saved = await saveMany(incoming);
       coverPath = cover ? saved.shift() : null;
       extraPaths = saved;
-    } catch (err) {
-      if (!(err instanceof UserError)) throw err;
+    } catch (rawErr) {
+      const err = rawErr instanceof UserError ? rawErr : uploadFailure(rawErr);
       return renderForm(res, { product, form, errors: v.errors, error: err.message, status: 400 });
     }
 

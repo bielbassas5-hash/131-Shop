@@ -13,11 +13,11 @@
     <section class="panel" aria-label="Artículos">
       <% cart.items.forEach((i) => { const max = shop.trackStock ? Math.min(i.stock, 10) : 10; %>
         <div class="cart-line">
-          <a href="/producto/<%= i.id %>">
+          <a href="<%= productUrl(i) %>">
             <% if (i.image_path) { %><img src="<%= thumb(i.image_path, 200) %>" alt="<%= i.title %>" width="84" height="84" /><% } %>
           </a>
           <div>
-            <h3><a href="/producto/<%= i.id %>"><%= i.title %></a></h3>
+            <h3><a href="<%= productUrl(i) %>"><%= i.title %></a></h3>
             <small><%= euro(i.price_cents) %> &middot; <%= TYPE_LABELS[i.type] || i.type %></small>
             <div class="controls">
               <form method="POST" action="/actualizar/<%= i.id %>">

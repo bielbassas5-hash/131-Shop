@@ -147,6 +147,7 @@ const baseEnv = () => ({
   OWNER_EMAIL: 'owner@example.com',
   MAIL_API_URL: `http://127.0.0.1:${MAIL_PORT}/send`,
   SITE_URL: 'https://tienda.test',
+  RATE_LIMIT_PER_MIN: '100000', // las suites generales hacen cientos de peticiones desde una IP
   TRACK_STOCK: '1', // las suites generales cubren el modo opcional con stock
   ANTHROPIC_API_KEY: 'test-anthropic-key',
   ANTHROPIC_BASE_URL: `http://127.0.0.1:${AI_PORT}`,
@@ -258,6 +259,41 @@ async function suiteStripe() {
   }
 }
 
+// Limite global de peticiones por IP: responde 429 en texto plano y no afecta a los archivos estaticos
+async function suiteRateLimit() {
+  console.log('\n# Limite global de peticiones');
+  const port = 3061;
+  const base = `http://127.0.0.1:${port}`;
+  const dbFile = path.join(os.tmpdir(), `tienda131-test5-${Date.now()}.db`);
+  const srv = spawn(process.execPath, ['server.js'], {
+    cwd: path.join(__dirname, '..'),
+    env: { ...baseEnv(), PORT: String(port), TURSO_DATABASE_URL: 'file:' + dbFile.replace(/\\/g, '/'), STRIPE_SECRET_KEY: '', RATE_LIMIT_PER_MIN: '20', ANTHROPIC_API_KEY: '' },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  try {
+    await waitForServer(base);
+    const statuses = [];
+    let retry = null;
+    let contentType = '';
+    for (let i = 0; i < 40; i++) {
+      const r = await fetch(base + '/healthz');
+      statuses.push(r.status);
+      if (r.status === 429 && retry === null) { retry = r.headers.get('retry-after'); contentType = r.headers.get('content-type') || ''; await r.text(); }
+      else await r.text();
+    }
+    check('pasado el limite se responde 429', statuses.includes(429) && statuses.slice(-5).every((s) => s === 429), statuses.join(','));
+    check('las primeras peticiones se atienden', statuses.slice(0, 3).every((s) => s === 200));
+    check('respuesta 429 con Retry-After y en texto plano', Number(retry) > 0 && /text\/plain/.test(contentType), `${retry} ${contentType}`);
+    let staticOk = 0;
+    for (let i = 0; i < 40; i++) { const r = await fetch(base + '/css/style.css'); if (r.status === 200) staticOk++; await r.arrayBuffer(); }
+    check('los archivos estaticos no cuentan para el limite', staticOk === 40, String(staticOk));
+  } finally {
+    srv.kill();
+    await sleep(300);
+    for (const f of [dbFile, dbFile + '-wal', dbFile + '-shm']) { try { fs.rmSync(f, { force: true }); } catch (_) { /* bloqueado en Windows */ } }
+  }
+}
+
 // Modo por defecto: produccion bajo demanda (sin stock, sin "agotado", sin "ultimas unidades").
 async function suiteMadeToOrder() {
   console.log('\n# Produccion bajo demanda (sin stock)');
@@ -297,6 +333,14 @@ async function suiteMadeToOrder() {
     const anon = new Client(base);
     const home = (await anon.get('/')).text;
     check('ambos productos visibles', home.includes('Bajo demanda') && home.includes('Otro'));
+    check('enlaces de producto con nombre legible', home.includes('href="/producto/1-bajo-demanda"'));
+    check('la URL con nombre responde 200', (await anon.get('/producto/1-bajo-demanda')).status === 200);
+    const wrongSlug = await anon.get('/producto/1-nombre-incorrecto');
+    check('nombre incorrecto redirige (301) a la URL buena', wrongSlug.status === 301 && wrongSlug.location === '/producto/1-bajo-demanda');
+    check('la URL solo con id sigue funcionando y declara la canonica', /rel="canonical" href="[^"]*\/producto\/1-bajo-demanda"/.test((await anon.get('/producto/1')).text));
+    check('direcciones raras de producto -> 404', (await anon.get('/producto/1_x')).status === 404 && (await anon.get('/producto/abc-1')).status === 404);
+    check('el mapa del sitio usa la URL con nombre', (await anon.get('/sitemap.xml')).text.includes('/producto/1-bajo-demanda'));
+    check('el tema claro es el predeterminado', /'light'/.test((await anon.get('/js/theme-init.js')).text) && !/matchMedia/.test((await anon.get('/js/theme-init.js')).text));
     check('sin "Agotado" ni "Ultimas unidades"', !/Agotado|Últimas unidades|Ultimas unidades/.test(home));
     const prod = (await anon.get('/producto/1')).text;
     check('la ficha no muestra unidades', !/Solo quedan|unidades|Agotado/.test(prod) && /Añadir al carrito/.test(prod));
@@ -477,6 +521,50 @@ async function main() {
     check('/pedido/<token falso> 404', (await anon.get('/pedido/' + 'a'.repeat(32))).status === 404);
     check('legal condiciones 200', (await anon.get('/legal/condiciones')).status === 200);
     check('legal inexistente 404', (await anon.get('/legal/x')).status === 404);
+
+    console.log('\n# Ataques habituales');
+    // Peticion cruda: fetch normaliza "../", asi que se envia la ruta tal cual
+    const rawGet = (p, method = 'GET') => new Promise((resolve, reject) => {
+      const req = http.request({ host: '127.0.0.1', port: PORT, path: p, method }, (res) => {
+        let body = '';
+        res.on('data', (d) => (body += d));
+        res.on('end', () => resolve({ status: res.statusCode, body }));
+      });
+      req.on('error', reject);
+      req.end();
+    });
+    for (const p of ['/.env', '/server.js', '/package.json', '/db.js', '/data/store.db', '/node_modules/express/package.json',
+      '/lib/orders.js', '/routes/admin/index.js', '/test/smoke.js', '/.git/config', '/render.yaml', '/README.md', '/views/index.ejs']) {
+      check(`no se expone ${p}`, (await rawGet(p)).status === 404);
+    }
+    for (const p of ['/uploads/../../.env', '/fonts/../../package.json', '/uploads/%2e%2e/%2e%2e/package.json',
+      '/css/..%2f..%2fdb.js', '/js/%2e%2e%2f%2e%2e%2fserver.js', '/uploads/..%5c..%5cpackage.json', '/%2e%2e/package.json']) {
+      const r = await rawGet(p);
+      check(`recorrido de directorios bloqueado ${p}`, r.status !== 200 && !/ADMIN_PASSWORD|"name": "tienda-131"|express-session/.test(r.body), String(r.status));
+    }
+    check('PUT no permitido', [403, 404].includes((await anon.req('PUT', '/admin/productos/1')).status));
+    check('DELETE no permitido', [403, 404].includes((await anon.req('DELETE', '/producto/1')).status));
+    check('/ADMIN (otra capitalizacion) tambien exige sesion', (await anon.get('/ADMIN')).location === '/admin/login');
+    check('claves __proto__ / constructor no rompen el orden', (await anon.get('/?orden=__proto__')).status === 200 && (await anon.get('/?orden=constructor')).status === 200);
+    check('claves __proto__ / constructor en paginas legales -> 404', (await anon.get('/legal/__proto__')).status === 404 && (await anon.get('/legal/constructor')).status === 404);
+    check('filtros con objetos o listas no rompen la tienda', (await anon.get('/?tipo[a]=1&q=a&q=b&orden[]=x')).status === 200);
+    check('cuerpo enorme -> 413 (no 500)', (await anon.req('POST', '/agregar/1', { form: { x: 'a'.repeat(100000) } })).status === 413);
+    check('URL mal codificada -> 400 (no 500)', (await rawGet('/producto/%E0%A4%A')).status === 400);
+    check('JSON en lugar de formulario no salta el CSRF', (await anon.req('POST', '/agregar/1', { headers: { 'content-type': 'application/json' }, multipart: '{"_csrf":"x"}' })).status === 403);
+    // El token CSRF de un usuario no vale para otro
+    const victim = new Client();
+    const victimToken = await victim.csrf('/producto/1');
+    const attacker = new Client();
+    await attacker.csrf('/producto/1');
+    check('token CSRF de otra sesion rechazado', (await attacker.post('/agregar/1', { _csrf: victimToken, back: '/' })).status === 403);
+    // Todas las rutas de administracion exigen sesion
+    const adminGets = ['/admin', '/admin/productos/nuevo', '/admin/productos/1/editar', '/admin/temas', '/admin/pedidos', '/admin/pedidos/1', '/admin/pedidos.csv', '/admin/copia-seguridad.json'];
+    const adminPosts = ['/admin/productos/nuevo', '/admin/productos/1/editar', '/admin/productos/1/eliminar', '/admin/productos/1/detectar-temas', '/admin/temas', '/admin/temas/clasificar', '/admin/temas/1/renombrar', '/admin/temas/1/eliminar', '/admin/pedidos/1/estado'];
+    const guestToken = await anon.csrf('/admin/login');
+    let openRoutes = [];
+    for (const p of adminGets) if ((await anon.get(p)).location !== '/admin/login') openRoutes.push('GET ' + p);
+    for (const p of adminPosts) if ((await anon.req('POST', `${p}?_csrf=${guestToken}`, { form: { _csrf: guestToken } })).location !== '/admin/login') openRoutes.push('POST ' + p);
+    check('ninguna ruta de administracion queda abierta sin sesion', openRoutes.length === 0, openRoutes.join(', '));
 
     console.log('\n# CSRF y acceso admin');
     check('POST sin CSRF -> 403', (await anon.post('/agregar/1', {})).status === 403);
@@ -839,12 +927,16 @@ async function main() {
     // Fuera de Render, CF-Connecting-IP NO se fia (se podria falsificar para evadir el limite)
     const spoof = await brute.post('/admin/login', { _csrf: bt2, password: ADMIN_PASSWORD }, { headers: { 'cf-connecting-ip': '198.51.100.77' } });
     check('fuera de Render se ignora CF-Connecting-IP', spoof.status === 429);
+    await sleep(600);
+    const alerts = mailTo('owner@example.com', /Intentos fallidos de acceso/);
+    check('aviso por email tras varios intentos fallidos (solo uno por hora)', alerts.length === 1 && /IP 127\.0\.0\.1|IP ::1|IP ::ffff:127\.0\.0\.1/.test(alerts[0].textContent), String(alerts.length));
 
     check('sin errores no controlados en el log', !/\[error\]|unhandledRejection|uncaughtException/.test(serverLog), serverLog.slice(-600));
 
     await suiteStripe();
     await suiteProdAndMigration();
     await suiteMadeToOrder();
+    await suiteRateLimit();
   } finally {
     server.kill();
     mailSrv.close();

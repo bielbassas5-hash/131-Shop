@@ -1,11 +1,15 @@
 // Acceso: inicio y cierre de sesion del administrador.
 const express = require('express');
-const { createLimiter, safeEqual, clientIp } = require('../../lib/security');
+const { createLimiter, safeEqual, clientIp, wrap } = require('../../lib/security');
+const notify = require('../../lib/notify');
 
 const router = express.Router();
 
-const loginLimiter = createLimiter({ windowMs: 15 * 60 * 1000, max: 8 });
+const loginLimiter = createLimiter({ windowMs: 15 * 60 * 1000, max: 8 }); // por IP
+const globalFails = createLimiter({ windowMs: 60 * 60 * 1000, max: 40 }); // fallos de TODAS las IPs
+const alertLimiter = createLimiter({ windowMs: 60 * 60 * 1000, max: 1 }); // un aviso por hora
 const ADMIN_SESSION_MS = 12 * 60 * 60 * 1000;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ---------- Acceso ----------
 router.get('/admin/login', (req, res) => {
@@ -13,29 +17,40 @@ router.get('/admin/login', (req, res) => {
   res.render('admin/login', { error: null, meta: { title: 'Acceso', noindex: true } });
 });
 
-router.post('/admin/login', (req, res, next) => {
-  const renderLogin = (error, status = 200) =>
-    res.status(status).render('admin/login', { error, meta: { title: 'Acceso', noindex: true } });
+router.post(
+  '/admin/login',
+  wrap(async (req, res) => {
+    const renderLogin = (error, status = 200) =>
+      res.status(status).render('admin/login', { error, meta: { title: 'Acceso', noindex: true } });
 
-  if (loginLimiter.blocked(clientIp(req))) {
-    return renderLogin('Demasiados intentos fallidos. Espera 15 minutos e inténtalo de nuevo.', 429);
-  }
-  const expected = process.env.ADMIN_PASSWORD;
-  const given = typeof req.body.password === 'string' ? req.body.password : '';
-  if (!expected || !given || !safeEqual(given, expected)) {
-    loginLimiter.hit(clientIp(req));
-    return renderLogin('Contraseña incorrecta.', 401);
-  }
+    const ip = clientIp(req);
+    if (loginLimiter.blocked(ip)) {
+      return renderLogin('Demasiados intentos fallidos. Espera 15 minutos e inténtalo de nuevo.', 429);
+    }
+    const expected = process.env.ADMIN_PASSWORD;
+    const given = typeof req.body.password === 'string' ? req.body.password : '';
+    if (!expected || !given || !safeEqual(given, expected)) {
+      loginLimiter.hit(ip);
+      globalFails.hit('all');
+      // Muchos fallos en total (ataque repartido entre varias IP): cada intento tarda 2 s
+      if (globalFails.blocked('all')) await sleep(2000);
+      // Aviso al propietario (como mucho uno por hora)
+      if (loginLimiter.count(ip) >= 5 && alertLimiter.take('alert')) {
+        notify.securityAlert({ ip, attempts: loginLimiter.count(ip) });
+      }
+      return renderLogin('Contraseña incorrecta.', 401);
+    }
 
-  loginLimiter.reset(clientIp(req));
-  // Nueva sesión al autenticarse (evita fijacion de sesión)
-  req.session.regenerate((err) => {
-    if (err) return next(err);
-    req.session.isAdmin = true;
-    req.session.cookie.maxAge = ADMIN_SESSION_MS;
-    res.redirect('/admin');
-  });
-});
+    loginLimiter.reset(ip);
+    // Nueva sesión al autenticarse (evita fijación de sesión)
+    req.session.regenerate((err) => {
+      if (err) throw err;
+      req.session.isAdmin = true;
+      req.session.cookie.maxAge = ADMIN_SESSION_MS;
+      res.redirect('/admin');
+    });
+  })
+);
 
 router.post('/admin/logout', (req, res) => {
   req.session.destroy(() => res.redirect('/admin/login'));

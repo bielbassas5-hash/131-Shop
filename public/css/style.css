@@ -33,8 +33,9 @@
   --font-display: 'Space Grotesk', 'Segoe UI', system-ui, sans-serif;
   --font-body: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
 }
-/* Tema claro: lo fija el boton (data-theme) o, sin eleccion, la preferencia del sistema */
-:root[data-theme='light'] {
+/* Tema claro (por defecto, sin eleccion guardada) u oscuro (boton de la cabecera, data-theme) */
+:root[data-theme='light'],
+:root:not([data-theme]) {
   color-scheme: light;
   --bg: #f6f3ee;
   --bg-soft: #efeae2;
@@ -59,34 +60,6 @@
   --overlay: rgba(246, 243, 238, 0.92);
   --prose: #36322b;
   --art-shadow: rgba(40, 30, 10, 0.28);
-}
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme]) {
-    color-scheme: light;
-    --bg: #f6f3ee;
-    --bg-soft: #efeae2;
-    --surface: #ffffff;
-    --surface-2: #efe9df;
-    --border: #e2dbcf;
-    --border-strong: #cdc4b4;
-    --text: #1c1a17;
-    --muted: #655e53;
-    --accent: #c4134c;
-    --accent-hover: #a50f3f;
-    --accent-strong: #c4134c;
-    --accent-strong-hover: #a50f3f;
-    --accent-soft: rgba(196, 19, 76, 0.1);
-    --gold: #7d5200;
-    --ok: #0c7048;
-    --warn: #7d5200;
-    --danger: #b3202a;
-    --info: #17559f;
-    --production: #6236b8;
-    --matte: #e8e2d6;
-    --overlay: rgba(246, 243, 238, 0.92);
-    --prose: #36322b;
-    --art-shadow: rgba(40, 30, 10, 0.28);
-    }
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -480,7 +453,6 @@ a.stat:hover { border-color: var(--text); }
 .theme-toggle .i-sun { display: none; }
 :root[data-theme='dark'] .theme-toggle .i-sun { display: block; }
 :root[data-theme='dark'] .theme-toggle .i-moon { display: none; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme]) .theme-toggle .i-sun { display: block; } :root:not([data-theme]) .theme-toggle .i-moon { display: none; } }
 
 /* ---------- Imagen ampliada ---------- */
 dialog.lightbox { border: 0; padding: 0; background: transparent; max-width: 100vw; max-height: 100vh; width: 100vw; height: 100vh; }

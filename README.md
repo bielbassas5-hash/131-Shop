@@ -97,3 +97,9 @@ El repositorio se despliega solo con cada `git push` a `main`. Servicio web Node
 ## Notas legales
 
 Las páginas legales son plantillas generales, **no asesoramiento jurídico**: revísalas con tu gestoría. Si vendes de forma habitual en España necesitarás alta como autónomo y facturación con IVA.
+
+## Consejos de mantenimiento
+
+- **Evitar el "sueño" del plan gratuito:** Render duerme la web tras 15 minutos sin visitas y la primera carga tarda ~50 s. Un monitor gratuito (por ejemplo UptimeRobot) que pida `https://TU-WEB/healthz` cada 5 minutos la mantiene despierta y te avisa si se cae.
+- **Límite de peticiones:** `RATE_LIMIT_PER_MIN` (240 por IP y minuto por defecto) frena el exceso de tráfico antes de tocar la base de datos.
+- **Accesos al panel:** tras 5 intentos fallidos desde una IP recibes un aviso por email (si tienes `OWNER_EMAIL` y el email configurado); a los 8 se bloquea esa IP 15 minutos.

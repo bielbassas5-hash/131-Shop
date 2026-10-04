@@ -11,11 +11,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title><%= pageTitle %></title>
   <meta name="description" content="<%= pageDesc %>" />
-  <meta name="theme-color" content="#0b0b0d" media="(prefers-color-scheme: dark)" />
-  <meta name="theme-color" content="#f6f3ee" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#f6f3ee" />
   <script src="/js/theme-init.js"></script>
   <% if (m.noindex) { %><meta name="robots" content="noindex, nofollow" />
-  <% } else { %><link rel="canonical" href="<%= shop.siteUrl + currentPath %>" /><% } %>
+  <% } else { %><link rel="canonical" href="<%= shop.siteUrl + (m.canonicalPath || currentPath) %>" /><% } %>
   <meta property="og:site_name" content="<%= artistName %>" />
   <meta property="og:title" content="<%= pageTitle %>" />
   <meta property="og:description" content="<%= pageDesc %>" />

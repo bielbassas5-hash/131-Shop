@@ -8,7 +8,7 @@ const compression = require('compression');
 
 const db = require('./db');
 const DbStore = require('./lib/sessionStore');
-const { csrf } = require('./lib/security');
+const { csrf, createLimiter, clientIp } = require('./lib/security');
 const { euro, dateTime, thumb, TYPE_LABELS, TYPE_PLURALS, STATUS_LABELS } = require('./lib/format');
 const { shippingCost, freeShippingThreshold, expirePending, trackStock } = require('./lib/orders');
 
@@ -81,6 +81,16 @@ app.use(
   })
 );
 
+// Tope global por IP (los archivos estaticos ya se sirvieron arriba y no cuentan). Responde en texto
+// plano y antes de tocar la sesion o la base de datos, para que un exceso cueste lo minimo.
+const globalLimiter = createLimiter({ windowMs: 60 * 1000, max: parseInt(process.env.RATE_LIMIT_PER_MIN || '240', 10) });
+app.use((req, res, next) => {
+  const ip = clientIp(req);
+  if (globalLimiter.take(ip)) return next();
+  res.set('Retry-After', String(globalLimiter.retryAfter(ip)));
+  res.status(429).type('text/plain; charset=utf-8').send('Demasiadas peticiones. Espera un minuto e inténtalo de nuevo.');
+});
+
 app.use(express.urlencoded({ extended: false, limit: '30kb' }));
 
 app.use(
@@ -100,6 +110,7 @@ app.use((req, res, next) => {
   res.locals.artistName = '131';
   res.locals.euro = euro;
   res.locals.dateTime = dateTime;
+  res.locals.productUrl = (p) => `/producto/${p.id}${db.slugOf(p.title) ? '-' + db.slugOf(p.title) : ''}`;
   res.locals.thumb = thumb;
   res.locals.TYPE_LABELS = TYPE_LABELS;
   res.locals.TYPE_PLURALS = TYPE_PLURALS;
@@ -151,8 +162,16 @@ app.use((req, res) => {
 // Manejador de errores: nunca se filtra la traza al visitante.
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
-  console.error(`[error] ${req.method} ${req.path}:`, err && err.stack ? err.stack : err);
   if (res.headersSent) return next(err);
+  const clientStatus = err && (err.status || err.statusCode);
+  if (Number.isInteger(clientStatus) && clientStatus >= 400 && clientStatus < 500) {
+    const titles = { 400: 'Petición no válida', 413: 'Petición demasiado grande' };
+    return res.status(clientStatus).render('error', { status: clientStatus, title: titles[clientStatus] || 'Petición no válida', message: 'No se ha podido procesar la petición. Revisa los datos e inténtalo de nuevo.' }, (renderErr, html) => {
+      if (renderErr) return res.type('text/plain').send('Petición no válida.');
+      res.send(html);
+    });
+  }
+  console.error(`[error] ${req.method} ${req.path}:`, err && err.stack ? err.stack : err);
   res.status(500).render('error', { status: 500 }, (renderErr, html) => {
     if (renderErr) return res.type('text/plain').send('Error interno. Inténtalo de nuevo mas tarde.');
     res.send(html);

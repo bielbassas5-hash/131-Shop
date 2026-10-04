@@ -13,7 +13,7 @@
       priceCurrency: 'EUR',
       price: (product.price_cents / 100).toFixed(2),
       availability: soldOut ? 'https://schema.org/OutOfStock' : 'https://schema.org/InStock',
-      url: shop.siteUrl + '/producto/' + product.id
+      url: shop.siteUrl + productUrl(product)
     }
   }).replace(/</g, '\\u003c');
 %>
@@ -60,7 +60,7 @@
       <% if (!soldOut) { %>
         <form method="POST" action="/agregar/<%= product.id %>">
           <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
-          <input type="hidden" name="back" value="/producto/<%= product.id %>" />
+          <input type="hidden" name="back" value="<%= productUrl(product) %>" />
           <button class="btn block" type="submit">Añadir al carrito</button>
         </form>
         <% if (shop.trackStock && product.stock <= 3) { %><p class="stock-note">Solo quedan <%= product.stock %> unidades.</p><% } %>

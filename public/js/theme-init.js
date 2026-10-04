@@ -2,7 +2,7 @@
 (function () {
   try {
     var saved = localStorage.getItem('theme');
-    var theme = saved === 'light' || saved === 'dark' ? saved : window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+    var theme = saved === 'light' || saved === 'dark' ? saved : 'light'; // sin eleccion guardada: tema claro (la obra luce mejor sobre papel)
     document.documentElement.setAttribute('data-theme', theme);
   } catch (e) {
     /* sin almacenamiento: se usa la preferencia del sistema por CSS */

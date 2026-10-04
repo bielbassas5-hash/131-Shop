@@ -5,6 +5,7 @@ const { TYPES, TYPE_LABELS, TYPE_PLURALS } = require('../lib/format');
 const { extrasOf } = require('../lib/productImages');
 const themesLib = require('../lib/themes');
 const { trackStock } = require('../lib/orders');
+const { slugOf } = db;
 
 const router = express.Router();
 
@@ -23,7 +24,7 @@ const hoverImage = (alias) =>
 // Catalogo con filtros. `theme` (opcional) agrupa solo los productos de ese tema.
 async function renderCatalog(req, res, theme) {
   const tipo = TYPES.includes(req.query.tipo) ? req.query.tipo : '';
-  const orden = SORTS[req.query.orden] ? req.query.orden : 'nuevo';
+  const orden = typeof req.query.orden === 'string' && Object.hasOwn(SORTS, req.query.orden) ? req.query.orden : 'nuevo';
   const q = typeof req.query.q === 'string' ? req.query.q.trim().slice(0, 40) : '';
 
   const where = ['active = 1'];
@@ -110,9 +111,14 @@ router.get(
 router.get(
   '/producto/:id',
   wrap(async (req, res) => {
-    if (!/^\d+$/.test(req.params.id)) return res.status(404).render('error', { status: 404 });
-    const product = await db.get('SELECT * FROM products WHERE id = ? AND active = 1', [req.params.id]);
+    // Acepta /producto/12 y /producto/12-gato-astronauta
+    const m = /^(\d{1,9})(?:-([a-z0-9-]{0,60}))?$/.exec(req.params.id);
+    if (!m) return res.status(404).render('error', { status: 404 });
+    const product = await db.get('SELECT * FROM products WHERE id = ? AND active = 1', [Number(m[1])]);
     if (!product) return res.status(404).render('error', { status: 404 });
+    const canonicalPath = res.locals.productUrl(product);
+    // Si la direccion lleva un nombre antiguo o incorrecto, se redirige a la buena (SEO)
+    if (m[2] !== undefined && `/producto/${req.params.id}` !== canonicalPath) return res.redirect(301, canonicalPath);
 
     // Relacionados: primero los que comparten tema, luego el mismo tipo
     const relatedQuery = db.all(
@@ -140,6 +146,7 @@ router.get(
           `${product.title} - ${TYPE_LABELS[product.type] || 'Producto'} de 131.`,
         image: product.image_path,
         type: 'product',
+        canonicalPath,
       },
     });
   })
@@ -153,7 +160,7 @@ const LEGAL = {
 };
 
 router.get('/legal/:page', (req, res) => {
-  const title = LEGAL[req.params.page];
+  const title = Object.hasOwn(LEGAL, req.params.page) ? LEGAL[req.params.page] : null;
   if (!title) return res.status(404).render('error', { status: 404 });
   res.render(`legal/${req.params.page}`, { meta: { title, description: title } });
 });
@@ -173,11 +180,11 @@ router.get(
   '/sitemap.xml',
   wrap(async (req, res) => {
     const base = siteUrl(req);
-    const products = await db.all('SELECT id, created_at FROM products WHERE active = 1');
+    const products = await db.all('SELECT id, title FROM products WHERE active = 1');
     const themes = await themesLib.publicThemes();
     const urls = [`<url><loc>${base}/</loc></url>`, `<url><loc>${base}/temas</loc></url>`]
       .concat(themes.map((t) => `<url><loc>${base}/tema/${t.slug}</loc></url>`))
-      .concat(products.map((p) => `<url><loc>${base}/producto/${p.id}</loc></url>`));
+      .concat(products.map((p) => `<url><loc>${base}${res.locals.productUrl(p)}</loc></url>`));
     res
       .type('application/xml')
       .send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls.join('')}</urlset>`);

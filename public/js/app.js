@@ -77,7 +77,7 @@
   if (themeBtn) {
     themeBtn.addEventListener('click', function () {
       var root = document.documentElement;
-      var current = root.getAttribute('data-theme') || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+      var current = root.getAttribute('data-theme') || 'light';
       var next = current === 'light' ? 'dark' : 'light';
       root.setAttribute('data-theme', next);
       try { localStorage.setItem('theme', next); } catch (e) { /* ignorado */ }
