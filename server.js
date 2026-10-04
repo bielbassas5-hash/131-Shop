@@ -45,8 +45,8 @@ app.use(
       directives: {
         defaultSrc: ["'self'"],
         scriptSrc: ["'self'"],
-        styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
-        fontSrc: ["'self'", 'https://fonts.gstatic.com'],
+        styleSrc: ["'self'"],
+        fontSrc: ["'self'"],
         imgSrc: ["'self'", 'data:', 'blob:', 'https://res.cloudinary.com'],
         connectSrc: ["'self'"],
         formAction: ["'self'", 'https://checkout.stripe.com'],
@@ -70,13 +70,22 @@ app.use((req, res, next) => {
 app.use(webhookRoutes);
 
 const assetVersion = Date.now().toString(36);
-app.use(express.static(path.join(__dirname, 'public'), { maxAge: '7d', index: false }));
+app.use(
+  express.static(path.join(__dirname, 'public'), {
+    maxAge: '7d',
+    index: false,
+    // Las tipografias no cambian nunca: cache de un año
+    setHeaders: (res, file) => {
+      if (/[\\/]fonts[\\/].+\.woff2$/.test(file)) res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    },
+  })
+);
 
 app.use(express.urlencoded({ extended: false, limit: '30kb' }));
 
 app.use(
   session({
-    name: 'sid',
+    name: isProd ? '__Host-sid' : 'sid',
     store: new DbStore(),
     secret,
     resave: false,

@@ -8,7 +8,7 @@
   </div>
 </div>
 
-<div class="chips" style="margin-bottom:20px">
+<div class="chips mb20">
   <a class="chip<%= !estado ? ' active' : '' %>" href="/admin/pedidos">Todos</a>
   <% ['pending', 'paid', 'shipped', 'cancelled'].forEach((s) => { %>
     <a class="chip<%= estado === s ? ' active' : '' %>" href="/admin/pedidos?estado=<%= s %>"><%= STATUS_LABELS[s] %> (<%= counts[s] || 0 %>)</a>

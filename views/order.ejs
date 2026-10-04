@@ -15,7 +15,7 @@
 <% if (cancelled) { %>
   <div class="flash error"><div class="flash-body">Este pedido está <b>cancelado</b>. Si crees que es un error, escríbenos<% if (shop.contactEmail) { %> a <a href="mailto:<%= shop.contactEmail %>"><%= shop.contactEmail %></a><% } %>.</div></div>
 <% } else { %>
-  <ol class="steps" style="list-style:none;padding:0" aria-label="Estado del pedido">
+  <ol class="steps" aria-label="Estado del pedido">
     <li class="step done">Pedido recibido</li>
     <li class="step <%= paid ? 'done' : 'current' %>">Pago confirmado</li>
     <li class="step <%= inProduction ? 'done' : (paid ? 'current' : '') %>">En producción</li>
@@ -26,10 +26,10 @@
 <div class="layout-2">
   <div>
     <% if (st === 'pending' && !stripeConfigured) { %>
-      <section class="panel" style="margin-bottom:24px">
+      <section class="panel mb24">
         <h2>Como pagar</h2>
         <p>Haz el pago por <b>Bizum</b> o <b>transferencia</b> e indica <b>Pedido #<%= order.id %></b> en el concepto. Prepararemos tu pedido en cuanto lo recibamos.</p>
-        <% if (!bizumPhone && !bankIban) { %><p class="flash warn" style="margin:0"><span class="flash-body">Escríbenos<%= shop.contactEmail ? ' a ' + shop.contactEmail : '' %> indicando tu número de pedido y te diremos cómo pagar.</span></p><% } %>
+        <% if (!bizumPhone && !bankIban) { %><p class="flash warn m0"><span class="flash-body">Escríbenos<%= shop.contactEmail ? ' a ' + shop.contactEmail : '' %> indicando tu número de pedido y te diremos cómo pagar.</span></p><% } %>
         <div class="pay-box">
           <% if (bizumPhone) { %>
           <div class="pay-row"><div><small>Bizum</small><b><%= bizumPhone %></b></div><button class="btn small secondary" type="button" data-copy="<%= bizumPhone %>">Copiar</button></div>
@@ -61,7 +61,7 @@
         <% } else { %>
           <dt>Dirección</dt><dd><%= shipTo.address %>, <%= shipTo.postal_code %> <%= shipTo.city %> (<%= shipTo.country %>)</dd>
         <% } %>
-        <% if (shipTo.notes) { %><dt>Notas</dt><dd style="white-space:pre-line"><%= shipTo.notes %></dd><% } %>
+        <% if (shipTo.notes) { %><dt>Notas</dt><dd class="prewrap"><%= shipTo.notes %></dd><% } %>
       </dl>
     </section>
   </div>
@@ -73,7 +73,7 @@
     <% }) %>
     <div class="summary-row"><span>Envío</span><span><%= shippingCents ? euro(shippingCents) : 'Gratis' %></span></div>
     <div class="summary-row total"><span>Total</span><span><%= euro(order.total_cents) %></span></div>
-    <a class="btn secondary block" style="margin-top:16px" href="/">Volver a la tienda</a>
+    <a class="btn secondary block mt16" href="/">Volver a la tienda</a>
   </aside>
 </div>
 

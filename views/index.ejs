@@ -28,9 +28,9 @@
     <form class="filters" method="GET" action="<%= filters.tema ? '/tema/' + filters.tema : '/' %>" role="search">
       <% if (filters.tipo) { %><input type="hidden" name="tipo" value="<%= filters.tipo %>" /><% } %>
       <label class="sr-only" for="q">Buscar</label>
-      <input id="q" type="search" name="q" value="<%= filters.q %>" placeholder="Buscar" maxlength="40" style="width:190px" />
+      <input id="q" type="search" name="q" value="<%= filters.q %>" placeholder="Buscar" maxlength="40" />
       <label class="sr-only" for="orden">Ordenar</label>
-      <select id="orden" name="orden" data-autosubmit style="width:auto">
+      <select id="orden" name="orden" data-autosubmit>
         <option value="nuevo"<%= filters.orden === 'nuevo' ? ' selected' : '' %>>Más recientes</option>
         <option value="precio_asc"<%= filters.orden === 'precio_asc' ? ' selected' : '' %>>Precio: menor a mayor</option>
         <option value="precio_desc"<%= filters.orden === 'precio_desc' ? ' selected' : '' %>>Precio: mayor a menor</option>

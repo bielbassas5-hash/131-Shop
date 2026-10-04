@@ -5,7 +5,7 @@ const { slugOf } = db;
 const { requireAdmin, adminHeaders } = require('../middleware/auth');
 const { deleteImage, UserError } = require('../lib/imageStorage');
 const { MAX_EXTRAS, extrasOf, validateFiles, saveMany, addExtras, removeExtras, removeAllExtras } = require('../lib/productImages');
-const { wrap, createLimiter, safeEqual } = require('../lib/security');
+const { wrap, createLimiter, safeEqual, clientIp } = require('../lib/security');
 const { validateProduct, text } = require('../lib/validate');
 const { STATUSES, setStatus, paymentInfo, trackStock, StockError } = require('../lib/orders');
 const { stripeConfigured } = require('../lib/payments');
@@ -78,17 +78,17 @@ router.post('/admin/login', (req, res, next) => {
   const renderLogin = (error, status = 200) =>
     res.status(status).render('admin/login', { error, meta: { title: 'Acceso', noindex: true } });
 
-  if (loginLimiter.blocked(req.ip)) {
+  if (loginLimiter.blocked(clientIp(req))) {
     return renderLogin('Demasiados intentos fallidos. Espera 15 minutos e inténtalo de nuevo.', 429);
   }
   const expected = process.env.ADMIN_PASSWORD;
   const given = typeof req.body.password === 'string' ? req.body.password : '';
   if (!expected || !given || !safeEqual(given, expected)) {
-    loginLimiter.hit(req.ip);
+    loginLimiter.hit(clientIp(req));
     return renderLogin('Contraseña incorrecta.', 401);
   }
 
-  loginLimiter.reset(req.ip);
+  loginLimiter.reset(clientIp(req));
   // Nueva sesión al autenticarse (evita fijacion de sesión)
   req.session.regenerate((err) => {
     if (err) return next(err);

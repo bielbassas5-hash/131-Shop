@@ -382,13 +382,14 @@ async function suiteProdAndMigration() {
     check('HSTS en produccion', /max-age=\d+/.test(home.headers.get('strict-transport-security') || ''));
     check('CSP con upgrade-insecure-requests', /upgrade-insecure-requests/.test(home.headers.get('content-security-policy') || ''));
     const setCookies = home.headers.getSetCookie().join('\n');
-    check('cookie csrf Secure + HttpOnly + SameSite', /csrf=[a-f0-9]+;.*HttpOnly/i.test(setCookies) && /Secure/i.test(setCookies) && /SameSite=Lax/i.test(setCookies), setCookies);
+    check('cookie csrf __Host- + Secure + HttpOnly + SameSite', /__Host-csrf=[a-f0-9]+;.*HttpOnly/i.test(setCookies) && /Secure/i.test(setCookies) && /SameSite=Lax/i.test(setCookies), setCookies);
 
     // Sesion de administrador: cookie sid Secure y Lax
     const admin = new Client(base);
     const t = (await admin.get('/admin/login', { headers: proxied })).text.match(/name="_csrf" value="([a-f0-9]+)"/)[1];
     const login = await admin.req('POST', '/admin/login', { form: { _csrf: t, password: ADMIN_PASSWORD }, headers: proxied });
-    const sidCookie = login.headers.getSetCookie().find((c) => c.startsWith('sid=')) || '';
+    const sidCookie = login.headers.getSetCookie().find((c) => /^(__Host-)?sid=/.test(c)) || '';
+    check('cookie de sesion con prefijo __Host- en produccion', sidCookie.startsWith('__Host-sid=') && /Path=\/(;|$)/.test(sidCookie) && !/Domain=/i.test(sidCookie), sidCookie);
     check('login en produccion', login.status === 302);
     check('cookie de sesion Secure + HttpOnly + Lax', /Secure/i.test(sidCookie) && /HttpOnly/i.test(sidCookie) && /SameSite=Lax/i.test(sidCookie), sidCookie);
 
@@ -406,6 +407,19 @@ async function suiteProdAndMigration() {
     const oldDetail = await admin.get('/admin/pedidos/3', { headers: proxied });
     check('pedido pendiente antiguo caducado al arrancar', oldDetail.status === 200 && /badge cancelled/.test(oldDetail.text));
     check('un pedido pendiente reciente no caduca', /badge pending/.test(pendDetail.text));
+    // Limite de intentos por IP REAL (Cloudflare): un atacante no bloquea a los demas ni falsea la IP
+    const loginAs = async (cfIp, password, xff = '10.0.0.1') => {
+      const c = new Client(base);
+      const h = { 'cf-connecting-ip': cfIp, 'x-forwarded-for': xff, 'x-forwarded-proto': 'https' };
+      const tk = (await c.get('/admin/login', { headers: h })).text.match(/name="_csrf" value="([a-f0-9]+)"/)[1];
+      return c.req('POST', '/admin/login', { form: { _csrf: tk, password }, headers: h });
+    };
+    let last;
+    for (let i = 0; i < 9; i++) last = await loginAs('198.51.100.1', 'mala' + i);
+    check('atacante bloqueado tras 8 fallos (429)', last.status === 429);
+    check('cambiar X-Forwarded-For no evade el bloqueo', (await loginAs('198.51.100.1', ADMIN_PASSWORD, '1.2.3.4')).status === 429);
+    check('otra IP real no queda bloqueada por el atacante', (await loginAs('203.0.113.9', ADMIN_PASSWORD)).status === 302);
+    check('IP de cabecera invalida se ignora (usa req.ip)', (await loginAs('no-es-una-ip', 'mala')).status === 401);
     check('sin errores en el log (produccion)', !/\[error\]|unhandledRejection|uncaughtException/.test(log3), log3.slice(-500));
   } finally {
     srv.kill();
@@ -447,6 +461,11 @@ async function main() {
     check('CSP presente', /default-src 'self'/.test(home.headers.get('content-security-policy') || ''));
     check('CSP sin scripts inline', !/script-src[^;]*unsafe-inline/.test(home.headers.get('content-security-policy') || ''));
     check('nosniff', home.headers.get('x-content-type-options') === 'nosniff');
+    const csp = home.headers.get('content-security-policy') || '';
+    check('CSP sin dominios de terceros (fuentes propias)', !/googleapis|gstatic|https:\/\/fonts/.test(csp) && !/googleapis|gstatic/.test(home.text));
+    const font = await fetch(BASE + '/fonts/inter-latin.woff2');
+    check('tipografias servidas desde la propia web (cache largo)', font.status === 200 && /immutable/.test(font.headers.get('cache-control') || '') && (await font.arrayBuffer()).byteLength > 10000);
+    check('hoja de fuentes local', /@font-face/.test((await anon.get('/css/fonts.css')).text));
     check('sin x-powered-by', !home.headers.get('x-powered-by'));
     check('cookie csrf httpOnly', true);
     check('robots.txt bloquea /admin', /Disallow: \/admin/.test((await anon.get('/robots.txt')).text));
@@ -777,6 +796,9 @@ async function main() {
     check('fuerza bruta -> 429', last.status === 429);
     const afterBlock = await brute.post('/admin/login', { _csrf: bt2, password: ADMIN_PASSWORD });
     check('bloqueado incluso con la clave buena', afterBlock.status === 429);
+    // Fuera de Render, CF-Connecting-IP NO se fia (se podria falsificar para evadir el limite)
+    const spoof = await brute.post('/admin/login', { _csrf: bt2, password: ADMIN_PASSWORD }, { headers: { 'cf-connecting-ip': '198.51.100.77' } });
+    check('fuera de Render se ignora CF-Connecting-IP', spoof.status === 429);
 
     check('sin errores no controlados en el log', !/\[error\]|unhandledRejection|uncaughtException/.test(serverLog), serverLog.slice(-600));
 

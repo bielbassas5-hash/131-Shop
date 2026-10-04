@@ -5,7 +5,7 @@
   <a class="btn ghost" href="/admin">Volver</a>
 </div>
 
-<section class="panel" style="margin-bottom:24px">
+<section class="panel mb24">
   <h2>Clasificación automática</h2>
   <p class="muted">
     <% if (aiEnabled) { %>
@@ -23,7 +23,7 @@
   </form>
 </section>
 
-<section class="panel" style="margin-bottom:24px">
+<section class="panel mb24">
   <h2>Nuevo tema</h2>
   <form method="POST" action="/admin/temas" class="inline-form">
     <input type="hidden" name="_csrf" value="<%= csrfToken %>" />

@@ -7,7 +7,7 @@
 
 <div class="layout-2">
   <div>
-    <section class="panel" style="margin-bottom:24px">
+    <section class="panel mb24">
       <h2>Artículos</h2>
       <% items.forEach((i) => { %>
         <div class="mini-line"><span><%= i.title %> &times; <%= i.quantity %></span><span><%= euro(i.price_cents * i.quantity) %></span></div>
@@ -28,7 +28,7 @@
         <dt>Ciudad</dt><dd><%= shipTo.postal_code %> <%= shipTo.city %></dd>
         <dt>País</dt><dd><%= shipTo.country %></dd>
         <% } %>
-        <% if (shipTo.notes) { %><dt>Notas</dt><dd style="white-space:pre-line"><%= shipTo.notes %></dd><% } %>
+        <% if (shipTo.notes) { %><dt>Notas</dt><dd class="prewrap"><%= shipTo.notes %></dd><% } %>
         <dt>Recibido</dt><dd><%= dateTime(order.created_at) %></dd>
       </dl>
     </section>

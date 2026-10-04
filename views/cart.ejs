@@ -44,17 +44,17 @@
       <% if (shop.freeFrom) { %>
         <% if (cart.freeShippingLeft > 0) { %>
           <small>Te faltan <b><%= euro(cart.freeShippingLeft) %></b> para el envío gratis</small>
-          <div class="progress" role="presentation"><span style="width:<%= Math.min(100, Math.round(cart.subtotal / shop.freeFrom * 100)) %>%"></span></div>
+          <progress class="meter" max="100" value="<%= Math.min(100, Math.round(cart.subtotal / shop.freeFrom * 100)) %>" aria-label="Progreso hacia el envío gratis"></progress>
         <% } else { %>
-          <p class="flash success" style="margin:0 0 14px">Tienes envío gratis.</p>
+          <p class="flash success mb14">Tienes envío gratis.</p>
         <% } %>
       <% } %>
       <div class="summary-row"><span>Subtotal</span><span><%= euro(cart.subtotal) %></span></div>
       <div class="summary-row"><span>Envío</span><span><%= cart.shipping ? euro(cart.shipping) : 'Gratis' %></span></div>
       <div class="summary-row total"><span>Total</span><span><%= euro(cart.total) %></span></div>
-      <% if (!shop.trackStock) { %><p class="field-hint" style="margin:14px 0 0">Se elabora bajo pedido<%= shop.leadTime ? ' · plazo de ' + shop.leadTime : '' %>.</p><% } %>
-      <a class="btn block" style="margin-top:18px" href="/checkout">Continuar con el pedido</a>
-      <p style="margin:14px 0 0;text-align:center"><a class="link" href="/">Seguir comprando</a></p>
+      <% if (!shop.trackStock) { %><p class="field-hint mt14">Se elabora bajo pedido<%= shop.leadTime ? ' · plazo de ' + shop.leadTime : '' %>.</p><% } %>
+      <a class="btn block mt18" href="/checkout">Continuar con el pedido</a>
+      <p class="mt14 center"><a class="link" href="/">Seguir comprando</a></p>
     </aside>
   </div>
 <% } %>

@@ -73,11 +73,11 @@
 
     <div class="field">
       <label for="notes">Notas del pedido (opcional)</label>
-      <textarea id="notes" name="notes" maxlength="300" style="min-height:80px" placeholder="Dedicatoria, indicaciones para la entrega..."><%= v.notes || '' %></textarea>
+      <textarea id="notes" name="notes" class="short" maxlength="300" placeholder="Dedicatoria, indicaciones para la entrega..."><%= v.notes || '' %></textarea>
     </div>
 
     <div class="field">
-      <label class="check" for="accept" style="color:var(--muted)">
+      <label class="check" for="accept">
         <input id="accept" type="checkbox" name="accept" value="1" <%- bad('accept') %> />
         <span>He leído y acepto las <a href="/legal/condiciones" target="_blank" rel="noopener">condiciones de compra</a> y la <a href="/legal/privacidad" target="_blank" rel="noopener">política de privacidad</a>.</span>
       </label>
@@ -94,8 +94,8 @@
     <% }) %>
     <div class="summary-row"><span>Envío</span><span data-ship-out><%= cart.shipping ? euro(cart.shipping) : 'Gratis' %></span></div>
     <div class="summary-row total"><span>Total</span><span data-total-out><%= euro(cart.total) %></span></div>
-    <% if (!shop.trackStock) { %><p class="field-hint" style="margin:14px 0 0">Se elabora bajo pedido<%= shop.leadTime ? ' · plazo de ' + shop.leadTime : '' %>.</p><% } %>
-    <p style="margin:14px 0 0"><a class="link" href="/carrito">Editar carrito</a></p>
+    <% if (!shop.trackStock) { %><p class="field-hint mt14">Se elabora bajo pedido<%= shop.leadTime ? ' · plazo de ' + shop.leadTime : '' %>.</p><% } %>
+    <p class="mt14"><a class="link" href="/carrito">Editar carrito</a></p>
   </aside>
 </div>
 

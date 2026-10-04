@@ -100,7 +100,7 @@
 </form>
 
 <% if (product) { %>
-  <form class="panel form-card" style="margin-top:20px" method="POST" action="/admin/productos/<%= product.id %>/detectar-temas">
+  <form class="panel form-card mt20" method="POST" action="/admin/productos/<%= product.id %>/detectar-temas">
     <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
     <h3>Detectar temas ahora</h3>
     <p class="field-hint">Analiza <%= aiEnabled ? 'la imagen con IA' : 'el título y la descripción' %> y <b>añade</b> los temas que encuentre, sin quitar los que ya tiene.</p>
