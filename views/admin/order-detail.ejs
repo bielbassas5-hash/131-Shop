@@ -49,6 +49,11 @@
         <label for="tracking">Número de seguimiento</label>
         <input id="tracking" type="text" name="tracking" value="<%= order.tracking_number || '' %>" maxlength="40" />
       </div>
+      <% if (mailConfigured) { %>
+      <div class="field">
+        <label class="check" for="notify"><input id="notify" type="checkbox" name="notify" value="1" checked /><span>Avisar al cliente por email (al marcar pagado o enviado)</span></label>
+      </div>
+      <% } %>
       <button class="btn block" type="submit">Guardar</button>
     </form>
     <hr />

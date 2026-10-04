@@ -1,6 +1,7 @@
 // Pruebas de humo + seguridad. Uso: npm test
 // Levanta el servidor con una base de datos temporal y lo ataca por HTTP.
 const { spawn } = require('child_process');
+const http = require('http');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -25,7 +26,8 @@ function check(name, cond, extra) {
 }
 
 class Client {
-  constructor() {
+  constructor(base = BASE) {
+    this.base = base;
     this.cookies = {};
   }
   async req(method, url, { form, multipart, headers = {} } = {}) {
@@ -39,7 +41,7 @@ class Client {
     } else if (multipart) {
       body = multipart;
     }
-    const res = await fetch(BASE + url, { method, headers: h, body, redirect: 'manual' });
+    const res = await fetch(this.base + url, { method, headers: h, body, redirect: 'manual' });
     for (const c of res.headers.getSetCookie ? res.headers.getSetCookie() : []) {
       const [pair] = c.split(';');
       const idx = pair.indexOf('=');
@@ -72,10 +74,10 @@ function productForm(fields, file) {
   return fd;
 }
 
-async function waitForServer() {
+async function waitForServer(base = BASE) {
   for (let i = 0; i < 60; i++) {
     try {
-      const r = await fetch(BASE + '/healthz');
+      const r = await fetch(base + '/healthz');
       if (r.ok) return;
     } catch (_) { /* aun no */ }
     await new Promise((r) => setTimeout(r, 250));
@@ -83,20 +85,153 @@ async function waitForServer() {
   throw new Error('El servidor no arranco');
 }
 
+const MAIL_PORT = 3057;
+const mails = [];
+function startMailServer() {
+  const srv = http.createServer((req, res) => {
+    let b = '';
+    req.on('data', (d) => (b += d));
+    req.on('end', () => {
+      try { mails.push({ key: req.headers['api-key'], ...JSON.parse(b) }); } catch (_) { /* ignorado */ }
+      res.writeHead(201, { 'content-type': 'application/json' });
+      res.end('{}');
+    });
+  });
+  return new Promise((r) => srv.listen(MAIL_PORT, '127.0.0.1', () => r(srv)));
+}
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const mailTo = (to, re) => mails.filter((m) => m.to[0].email === to && re.test(m.subject));
+
+const baseEnv = () => ({
+  ...process.env,
+  TURSO_AUTH_TOKEN: '',
+  CLOUDINARY_CLOUD_NAME: '',
+  CLOUDINARY_API_KEY: '',
+  CLOUDINARY_API_SECRET: '',
+  ADMIN_PASSWORD,
+  SESSION_SECRET: 'test-session-secret-0123456789',
+  BREVO_API_KEY: 'test-key',
+  MAIL_FROM: 'tienda@example.com',
+  OWNER_EMAIL: 'owner@example.com',
+  MAIL_API_URL: `http://127.0.0.1:${MAIL_PORT}/send`,
+  SITE_URL: 'https://tienda.test',
+});
+
+// Segunda instancia con Stripe configurado: webhook firmado y fallos del proveedor.
+async function suiteStripe() {
+  console.log('\n# Stripe: webhook firmado y fallos de pago');
+  const stripeLib = require('stripe')('sk_test_dummy');
+  const { createClient } = require('@libsql/client');
+  const port = 3056;
+  const base = `http://127.0.0.1:${port}`;
+  const dbFile = path.join(os.tmpdir(), `tienda131-test2-${Date.now()}.db`);
+  const dbUrl = 'file:' + dbFile.replace(/\\/g, '/');
+  const secret = 'whsec_testsecret';
+  const srv = spawn(process.execPath, ['server.js'], {
+    cwd: path.join(__dirname, '..'),
+    env: {
+      ...baseEnv(),
+      PORT: String(port),
+      TURSO_DATABASE_URL: dbUrl,
+      STRIPE_SECRET_KEY: 'sk_test_dummy',
+      STRIPE_WEBHOOK_SECRET: secret,
+    },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  let log2 = '';
+  srv.stdout.on('data', (d) => (log2 += d));
+  srv.stderr.on('data', (d) => (log2 += d));
+  let c;
+  try {
+    await waitForServer(base);
+    c = createClient({ url: dbUrl });
+    await c.execute("INSERT INTO products (title, price_cents, image_path, type, stock) VALUES ('Print test', 4000, '/x.png', 'print', 3)");
+
+    const mkOrder = async (tokenChar, session) => {
+      await c.execute({
+        sql: "INSERT INTO orders (token, customer_email, customer_name, shipping_address, total_cents, shipping_cents, status, stripe_session_id) VALUES (?, 'cli@example.com', 'Cli', '{\"name\":\"Cli\"}', 4350, 350, 'pending', ?)",
+        args: [tokenChar.repeat(32), session],
+      });
+      const o = await c.execute({ sql: 'SELECT id FROM orders WHERE stripe_session_id = ?', args: [session] });
+      const id = Number(o.rows[0].id);
+      await c.execute({ sql: "INSERT INTO order_items (order_id, product_id, title, price_cents, quantity) VALUES (?, 1, 'Print test', 4000, 1)", args: [id] });
+      await c.execute('UPDATE products SET stock = stock - 1 WHERE id = 1');
+      return id;
+    };
+    const statusOf = async (id) => (await c.execute({ sql: 'SELECT status FROM orders WHERE id = ?', args: [id] })).rows[0].status;
+    const stockOf = async () => Number((await c.execute('SELECT stock FROM products WHERE id = 1')).rows[0].stock);
+    const hook = async (event, { sign = true } = {}) => {
+      const payload = JSON.stringify(event);
+      const header = sign ? stripeLib.webhooks.generateTestHeaderString({ payload, secret }) : 'invalid';
+      const r = await fetch(base + '/webhooks/stripe', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'stripe-signature': header },
+        body: payload,
+      });
+      return r.status;
+    };
+    const completed = (session, over = {}) => ({
+      id: 'evt_1',
+      object: 'event',
+      type: 'checkout.session.completed',
+      data: {
+        object: {
+          id: session, object: 'checkout.session', payment_status: 'paid', amount_total: 4350, currency: 'eur',
+          metadata: { order_id: '1' }, ...over,
+        },
+      },
+    });
+
+    const id1 = await mkOrder('a', 'cs_test_1');
+    check('webhook con firma falsa -> 400', (await hook(completed('cs_test_1'), { sign: false })) === 400);
+    check('firma falsa no cambia el pedido', (await statusOf(id1)) === 'pending');
+    check('webhook con importe manipulado se ignora', (await hook(completed('cs_test_1', { amount_total: 100 }))) === 200 && (await statusOf(id1)) === 'pending');
+    check('webhook con pedido que no coincide se ignora', (await hook(completed('cs_test_1', { metadata: { order_id: '99' } }))) === 200 && (await statusOf(id1)) === 'pending');
+    check('webhook de sesion sin pagar se ignora', (await hook(completed('cs_test_1', { payment_status: 'unpaid' }))) === 200 && (await statusOf(id1)) === 'pending');
+    check('webhook valido marca el pedido como pagado', (await hook(completed('cs_test_1'))) === 200 && (await statusOf(id1)) === 'paid');
+    await sleep(500);
+    check('email de pago al cliente (webhook)', mailTo('cli@example.com', /Pago recibido/).length === 1);
+    check('email de pago al propietario (webhook)', mailTo('owner@example.com', /Pago confirmado/).length === 1);
+    await hook(completed('cs_test_1'));
+    await sleep(300);
+    check('webhook repetido es idempotente (sin emails dobles)', mailTo('cli@example.com', /Pago recibido/).length === 1);
+
+    const id2 = await mkOrder('b', 'cs_test_2');
+    const before = await stockOf();
+    const expired = (session) => ({ id: 'evt_2', object: 'event', type: 'checkout.session.expired', data: { object: { id: session } } });
+    check('sesion caducada cancela el pedido', (await hook(expired('cs_test_2'))) === 200 && (await statusOf(id2)) === 'cancelled');
+    check('sesion caducada devuelve el stock', (await stockOf()) === before + 1);
+    check('caducar un pedido ya pagado no lo cancela', (await hook(expired('cs_test_1'))) === 200 && (await statusOf(id1)) === 'paid');
+
+    // Si Stripe falla al crear la sesion, el pedido se cancela y el stock se libera
+    const buyer = new Client(base);
+    const tk = await buyer.csrf('/producto/1');
+    await buyer.post('/agregar/1', { _csrf: tk, back: '/' });
+    const stockBefore = await stockOf();
+    const res = await buyer.post('/checkout/crear', {
+      _csrf: tk, name: 'Eva Ruiz', email: 'eva@example.com', address: 'Calle Sol 5', city: 'Sevilla',
+      postal_code: '41001', country: 'ES', accept: '1',
+    });
+    check('si Stripe falla vuelve al carrito', res.status === 302 && res.location === '/carrito', res.location);
+    check('si Stripe falla se libera el stock', (await stockOf()) === stockBefore);
+    check('sin errores no controlados (Stripe)', !/unhandledRejection|uncaughtException/.test(log2), log2.slice(-500));
+  } finally {
+    if (c) c.close();
+    srv.kill();
+    await sleep(300);
+    for (const f of [dbFile, dbFile + '-wal', dbFile + '-shm']) { try { fs.rmSync(f, { force: true }); } catch (_) { /* archivo aun bloqueado en Windows: queda en la carpeta temporal */ } }
+  }
+}
+
 async function main() {
+  const mailSrv = await startMailServer();
   const server = spawn(process.execPath, ['server.js'], {
     cwd: path.join(__dirname, '..'),
     env: {
-      ...process.env,
+      ...baseEnv(),
       PORT: String(PORT),
       TURSO_DATABASE_URL: 'file:' + tmpDb.replace(/\\/g, '/'),
-      TURSO_AUTH_TOKEN: '',
-      CLOUDINARY_CLOUD_NAME: '',
-      CLOUDINARY_API_KEY: '',
-      CLOUDINARY_API_SECRET: '',
       STRIPE_SECRET_KEY: '',
-      ADMIN_PASSWORD,
-      SESSION_SECRET: 'test-session-secret-0123456789',
       SHIPPING_COST_CENTS: '350',
       FREE_SHIPPING_THRESHOLD_CENTS: '10000',
       PICKUP_ENABLED: '1',
@@ -213,6 +348,11 @@ async function main() {
     check('pagina de pedido 200 y no-store', orderPage.status === 200 && /no-store/.test(orderPage.headers.get('cache-control') || ''));
     check('total del servidor ignora el cliente (12,50)', /12,50/.test(orderPage.text));
     check('instrucciones Bizum', orderPage.text.includes('600111222'));
+    await sleep(500);
+    const custMail = mailTo('ana@example.com', /Hemos recibido tu pedido #1/);
+    check('email de confirmacion al cliente', custMail.length === 1 && custMail[0].textContent.includes('600111222') && custMail[0].textContent.includes('https://tienda.test/pedido/'));
+    check('email de aviso al propietario', mailTo('owner@example.com', /Nuevo pedido.*#1/).length === 1);
+    check('email enviado con la clave de API', !!custMail[0] && custMail[0].key === 'test-key');
 
     // El stock (2) quedo reservado por el pedido: otro cliente ya no puede comprar
     const rival = new Client();
@@ -251,11 +391,15 @@ async function main() {
     tok = await admin.csrf('/admin');
     const orders = await admin.get('/admin/pedidos');
     check('listado de pedidos', orders.text.includes('Ana Perez'));
-    const pay = await admin.post('/admin/pedidos/1/estado', { _csrf: tok, status: 'paid', tracking: '' });
+    const pay = await admin.post('/admin/pedidos/1/estado', { _csrf: tok, status: 'paid', tracking: '', notify: '1' });
     check('marcar pagado', pay.status === 302);
-    const ship = await admin.post('/admin/pedidos/1/estado', { _csrf: tok, status: 'shipped', tracking: 'PQ123456789ES' });
+    const ship = await admin.post('/admin/pedidos/1/estado', { _csrf: tok, status: 'shipped', tracking: 'PQ123456789ES', notify: '1' });
     check('marcar enviado con seguimiento', ship.status === 302);
     check('cliente ve seguimiento', (await buyer.get(order.location)).text.includes('PQ123456789ES'));
+    await sleep(500);
+    check('email "pago recibido" al marcar pagado', mailTo('ana@example.com', /Pago recibido/).length === 1);
+    const shipMail = mailTo('ana@example.com', /va de camino/);
+    check('email "enviado" con seguimiento', shipMail.length === 1 && shipMail[0].textContent.includes('PQ123456789ES'));
     check('estado invalido rechazado', (await admin.post('/admin/pedidos/1/estado', { _csrf: tok, status: 'hacked' })).status === 400);
     const csv = await admin.get('/admin/pedidos.csv');
     check('CSV exportado', csv.status === 200 && /text\/csv/.test(csv.headers.get('content-type')) && csv.text.includes('PQ123456789ES'));
@@ -294,10 +438,13 @@ async function main() {
     check('bloqueado incluso con la clave buena', afterBlock.status === 429);
 
     check('sin errores no controlados en el log', !/\[error\]|unhandledRejection|uncaughtException/.test(serverLog), serverLog.slice(-600));
+
+    await suiteStripe();
   } finally {
     server.kill();
+    mailSrv.close();
     await new Promise((r) => setTimeout(r, 300));
-    for (const f of [tmpDb, tmpDb + '-wal', tmpDb + '-shm']) fs.rmSync(f, { force: true });
+    for (const f of [tmpDb, tmpDb + '-wal', tmpDb + '-shm']) { try { fs.rmSync(f, { force: true }); } catch (_) { /* archivo aun bloqueado en Windows: queda en la carpeta temporal */ } }
     if (fs.existsSync(uploadsDir)) {
       for (const f of fs.readdirSync(uploadsDir)) {
         const full = path.join(uploadsDir, f);

@@ -6,7 +6,9 @@ const { saveImage, deleteImage, UserError } = require('../lib/imageStorage');
 const { wrap, createLimiter, safeEqual } = require('../lib/security');
 const { validateProduct, text } = require('../lib/validate');
 const { STATUSES, setStatus, StockError } = require('../lib/orders');
-const { STATUS_LABELS, TYPE_LABELS } = require('../lib/format');
+const { STATUS_LABELS } = require('../lib/format');
+const notify = require('../lib/notify');
+const { configured: mailConfigured } = require('../lib/mailer');
 
 const router = express.Router();
 router.use('/admin', adminHeaders);
@@ -285,6 +287,7 @@ router.get(
       mailto,
       publicLink: link,
       statuses: STATUSES,
+      mailConfigured: mailConfigured(),
       meta: { title: `Pedido #${order.id}`, noindex: true },
     });
   })
@@ -299,7 +302,13 @@ router.post(
     }
     const tracking = text(req.body.tracking, 40);
     try {
-      await setStatus(Number(req.params.id), req.body.status, { tracking });
+      const { previous } = await setStatus(Number(req.params.id), req.body.status, { tracking });
+      if (req.body.notify === '1') {
+        const base = res.locals.shop.siteUrl;
+        const id = Number(req.params.id);
+        if (req.body.status === 'paid' && previous === 'pending') notify.paid(id, base);
+        if (req.body.status === 'shipped' && previous !== 'shipped') notify.shipped(id, base);
+      }
       req.session.flash = { type: 'success', msg: 'Pedido actualizado.' };
     } catch (err) {
       if (!(err instanceof StockError)) throw err;

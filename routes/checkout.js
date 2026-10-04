@@ -6,10 +6,8 @@ const { validateCheckout, allowedCountries, COUNTRY_NAMES } = require('../lib/va
 
 const router = express.Router();
 
-const stripeConfigured = !!(
-  process.env.STRIPE_SECRET_KEY && process.env.STRIPE_SECRET_KEY.startsWith('sk_')
-);
-const stripe = stripeConfigured ? require('stripe')(process.env.STRIPE_SECRET_KEY) : null;
+const { stripe, stripeConfigured, confirmSession } = require('../lib/payments');
+const notify = require('../lib/notify');
 
 const orderLimiter = createLimiter({ windowMs: 60 * 60 * 1000, max: 20 });
 const TOKEN_RE = /^[a-f0-9]{32}$/;
@@ -93,6 +91,7 @@ router.post(
 
     // Pago manual (Bizum / transferencia): el pedido queda pendiente hasta que se confirme.
     req.session.cart = {};
+    notify.orderCreated(order.id, { manualPayment: true, base: baseUrl(req) });
     res.redirect(`/pedido/${order.token}`);
   })
 );
@@ -110,13 +109,8 @@ router.get(
     if (stripeConfigured && sessionId && order.status === 'pending' && order.stripe_session_id) {
       try {
         const s = await stripe.checkout.sessions.retrieve(sessionId);
-        if (
-          s.id === order.stripe_session_id &&
-          s.payment_status === 'paid' &&
-          s.metadata && String(s.metadata.order_id) === String(order.id) &&
-          s.amount_total === Number(order.total_cents)
-        ) {
-          await setStatus(order.id, 'paid');
+        // Debe ser la sesion de ESTE pedido (el pedido la guardo al crearla)
+        if (s.id === order.stripe_session_id && (await confirmSession(s, baseUrl(req)))) {
           req.session.cart = {};
           order = await db.get('SELECT * FROM orders WHERE id = ?', [order.id]);
         }

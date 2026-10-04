@@ -16,6 +16,7 @@ const storeRoutes = require('./routes/store');
 const cartRoutes = require('./routes/cart');
 const checkoutRoutes = require('./routes/checkout');
 const adminRoutes = require('./routes/admin');
+const webhookRoutes = require('./routes/webhooks');
 
 const isProd = !!(process.env.RENDER || process.env.NODE_ENV === 'production');
 const PORT = process.env.PORT || 3000;
@@ -64,6 +65,10 @@ app.use((req, res, next) => {
   next();
 });
 
+// El webhook de Stripe necesita el cuerpo crudo y se autentica por firma: va antes que
+// los parsers, la sesion y el CSRF.
+app.use(webhookRoutes);
+
 const assetVersion = Date.now().toString(36);
 app.use(express.static(path.join(__dirname, 'public'), { maxAge: '7d', index: false }));
 
@@ -111,6 +116,12 @@ app.use((req, res, next) => {
   } else {
     res.locals.flash = null;
   }
+  next();
+});
+
+// Paginas con datos personales: nunca en cache compartida ni del navegador
+app.use(['/carrito', '/checkout', '/pedido'], (req, res, next) => {
+  res.set('Cache-Control', 'no-store');
   next();
 });
 
