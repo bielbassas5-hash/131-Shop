@@ -8,8 +8,16 @@
   </div>
 </div>
 
+<form class="inline-form mb20" method="GET" action="/admin/pedidos" role="search">
+  <% if (estado) { %><input type="hidden" name="estado" value="<%= estado %>" /><% } %>
+  <label class="sr-only" for="q">Buscar pedido</label>
+  <input id="q" type="search" name="q" value="<%= q %>" placeholder="Nº de pedido, nombre o email" maxlength="60" />
+  <button class="btn secondary" type="submit">Buscar</button>
+  <% if (q) { %><a class="link" href="/admin/pedidos<%= estado ? '?estado=' + estado : '' %>">Quitar búsqueda</a><% } %>
+</form>
+
 <div class="chips mb20">
-  <a class="chip<%= !estado ? ' active' : '' %>" href="/admin/pedidos">Todos</a>
+  <a class="chip<%= !estado ? ' active' : '' %>" href="/admin/pedidos<%= q ? '?q=' + encodeURIComponent(q) : '' %>">Todos</a>
   <% ['pending', 'paid', 'shipped', 'cancelled'].forEach((s) => { %>
     <a class="chip<%= estado === s ? ' active' : '' %>" href="/admin/pedidos?estado=<%= s %>"><%= STATUS_LABELS[s] %> (<%= counts[s] || 0 %>)</a>
   <% }) %>

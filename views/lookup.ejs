@@ -1,0 +1,21 @@
+<%- include('partials/header') %>
+
+<div class="panel form-card centered">
+  <h1>Consultar mi pedido</h1>
+  <p class="muted">Introduce el número de pedido y el email con el que lo hiciste.</p>
+  <% if (error) { %><div class="flash error" role="alert"><div class="flash-body"><%= error %></div></div><% } %>
+  <form method="POST" action="/pedido">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+    <div class="field">
+      <label for="numero">Número de pedido</label>
+      <input id="numero" type="text" name="numero" value="<%= values.numero || '' %>" inputmode="numeric" maxlength="12" placeholder="Ej.: 12" required />
+    </div>
+    <div class="field">
+      <label for="email">Email</label>
+      <input id="email" type="email" name="email" value="<%= values.email || '' %>" autocomplete="email" maxlength="120" required />
+    </div>
+    <button class="btn block" type="submit">Ver mi pedido</button>
+  </form>
+</div>
+
+<%- include('partials/footer') %>

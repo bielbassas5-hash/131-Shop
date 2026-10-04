@@ -397,6 +397,7 @@ async function suiteProdAndMigration() {
     check('pedido antiguo migrado y visible en el admin', detail.status === 200 && detail.text.includes('Cliente Antiguo'));
     const tokenMatch = detail.text.match(/\/pedido\/([a-f0-9]{32})/);
     check('pedido antiguo recibe un token', !!tokenMatch);
+    check('pedido antiguo recibe su historial inicial', detail.text.includes('Historial') && /<time>[^<]*\d/.test(detail.text));
     if (tokenMatch) check('pedido antiguo accesible por su token', (await anon.get(`/pedido/${tokenMatch[1]}`, { headers: proxied })).status === 200);
     const pendDetail = await admin.get('/admin/pedidos/2', { headers: proxied });
     const pendToken = pendDetail.text.match(/\/pedido\/([a-f0-9]{32})/);
@@ -614,6 +615,18 @@ async function main() {
     tok = await admin.csrf('/admin');
     const orders = await admin.get('/admin/pedidos');
     check('listado de pedidos', orders.text.includes('Ana Perez'));
+    check('buscar pedido por nombre', (await admin.get('/admin/pedidos?q=Ana')).text.includes('Ana Perez'));
+    check('buscar pedido por numero (#1)', (await admin.get('/admin/pedidos?q=%231')).text.includes('Ana Perez'));
+    check('buscar pedido por email', (await admin.get('/admin/pedidos?q=ana@example')).text.includes('Ana Perez'));
+    check('busqueda sin resultados', (await admin.get('/admin/pedidos?q=zzzzzz')).text.includes('No hay pedidos'));
+    check('el comodin % no devuelve todos los pedidos', (await admin.get('/admin/pedidos?q=%25')).text.includes('No hay pedidos'));
+    const backup = await admin.get('/admin/copia-seguridad.json');
+    let backupData = {};
+    try { backupData = JSON.parse(backup.text); } catch (_) { /* se comprueba abajo */ }
+    check('copia de seguridad JSON descargable', backup.status === 200 && /attachment/.test(backup.headers.get('content-disposition') || '') && Array.isArray(backupData.orders) && backupData.orders.length >= 1 && Array.isArray(backupData.themes));
+    check('copia de seguridad solo para el administrador', (await anon.get('/admin/copia-seguridad.json')).location === '/admin/login');
+    const dashHtml = (await admin.get('/admin')).text;
+    check('tarjetas del panel enlazan a los pedidos', dashHtml.includes('href="/admin/pedidos?estado=pending"') && dashHtml.includes('href="/admin/pedidos?estado=paid"'));
     const pay = await admin.post('/admin/pedidos/1/estado', { _csrf: tok, status: 'paid', tracking: '', notify: '1' });
     check('marcar pagado', pay.status === 302);
     const prodStep = await admin.post('/admin/pedidos/1/estado', { _csrf: tok, status: 'production', tracking: '', notify: '1' });
@@ -626,6 +639,9 @@ async function main() {
     const ship = await admin.post('/admin/pedidos/1/estado', { _csrf: tok, status: 'shipped', tracking: 'PQ123456789ES', notify: '1' });
     check('marcar enviado con seguimiento', ship.status === 302);
     check('cliente ve seguimiento', (await buyer.get(order.location)).text.includes('PQ123456789ES'));
+    const hist = (await buyer.get(order.location)).text;
+    check('el cliente ve el historial con fechas', hist.includes('Historial') && hist.includes('Pendiente de pago') && hist.includes('En producción') && /<time>[^<]*\d/.test(hist));
+    check('el admin ve el historial del pedido', (await admin.get('/admin/pedidos/1')).text.includes('Historial'));
     await sleep(500);
     check('email "pago recibido" al marcar pagado', mailTo('ana@example.com', /Pago recibido/).length === 1);
     const shipMail = mailTo('ana@example.com', /va de camino/);
@@ -720,6 +736,7 @@ async function main() {
     const grouped = await anon.get('/temas');
     check('vista agrupada /temas', grouped.status === 200 && grouped.text.includes('id="tema-montanas"') && grouped.text.includes('Pico nevado'));
     check('chips de temas en la tienda', (await anon.get('/')).text.includes('href="/tema/montanas"'));
+    check('la portada comparte imagen (og:image)', (await anon.get('/')).text.includes('property="og:image"'));
     const pico = (await anon.get('/?q=Pico')).text.match(/\/producto\/(\d+)/)[1];
     check('etiqueta de tema en la ficha del producto', (await anon.get(`/producto/${pico}`)).text.includes('href="/tema/montanas"'));
     check('filtro combinado tema + tipo',
@@ -790,6 +807,19 @@ async function main() {
     const sitemap = (await anon.get('/sitemap.xml')).text;
     check('sitemap incluye temas', sitemap.includes('/tema/montanas') && sitemap.includes('/temas'));
     check('sin errores no controlados (temas)', !/unhandledRejection|uncaughtException|TypeError/.test(serverLog), serverLog.slice(-500));
+
+    console.log('\n# Consultar un pedido (numero + email)');
+    const lk = new Client();
+    const lkt = await lk.csrf('/pedido');
+    check('pagina de consulta de pedido', !!lkt);
+    check('numero + email (sin importar mayusculas) llevan al pedido', (await lk.post('/pedido', { _csrf: lkt, numero: '#1', email: 'ANA@example.com' })).location === order.location);
+    const badEmail = await lk.post('/pedido', { _csrf: lkt, numero: '1', email: 'otro@example.com' });
+    const badNumber = await lk.post('/pedido', { _csrf: lkt, numero: '99999', email: 'ana@example.com' });
+    check('datos incorrectos: mismo mensaje exista o no el pedido', badEmail.status === 404 && badNumber.status === 404 && badEmail.text.includes('No encontramos') && badNumber.text.includes('No encontramos'));
+    check('numero con inyeccion SQL -> 404 sin fallo', (await lk.post('/pedido', { _csrf: lkt, numero: "1' OR 1=1--", email: 'ana@example.com' })).status === 404);
+    let lastLookup;
+    for (let i = 0; i < 10; i++) lastLookup = await lk.post('/pedido', { _csrf: lkt, numero: '1', email: 'x@example.com' });
+    check('limite de consultas por hora (429)', lastLookup.status === 429);
 
     console.log('\n# Sesiones y limite de intentos');
     await admin.post('/admin/logout', { _csrf: tok });

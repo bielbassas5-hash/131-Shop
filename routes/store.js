@@ -56,6 +56,7 @@ async function renderCatalog(req, res, theme) {
       title: theme ? theme.name : tipo ? TYPE_PLURALS[tipo] : 'Tienda',
       description: theme ? `${theme.name}: dibujos, prints y stickers de 131.` : 'Dibujos, prints y stickers de 131.',
       noindex: !!theme && products.length === 0, // un tema vacio no es contenido para buscadores
+      image: (products[0] && products[0].image_path) || undefined, // vista previa al compartir el enlace
     },
   });
 }

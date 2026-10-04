@@ -5,6 +5,7 @@
   <div class="table-actions">
     <a class="btn secondary" href="/admin/pedidos">Pedidos</a>
     <a class="btn secondary" href="/admin/temas">Temas</a>
+    <a class="btn ghost" href="/admin/copia-seguridad.json" download>Copia de seguridad</a>
     <a class="btn" href="/admin/productos/nuevo">+ Nuevo producto</a>
     <form method="POST" action="/admin/logout">
       <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
@@ -35,8 +36,8 @@
 
 <div class="stats">
   <div class="stat"><b><%= euro(stats.revenue) %></b><span>Ingresos confirmados</span></div>
-  <div class="stat<%= stats.pending ? ' alert' : '' %>"><b><%= stats.pending %></b><span>Pedidos pendientes de pago</span></div>
-  <div class="stat<%= stats.toShip ? ' alert' : '' %>"><b><%= stats.toShip %></b><span>Pagados, por enviar</span></div>
+  <a class="stat<%= stats.pending ? ' alert' : '' %>" href="/admin/pedidos?estado=pending"><b><%= stats.pending %></b><span>Pedidos pendientes de pago</span></a>
+  <a class="stat<%= stats.toShip ? ' alert' : '' %>" href="/admin/pedidos?estado=paid"><b><%= stats.toShip %></b><span>Pagados, por elaborar y enviar</span></a>
   <% if (shop.trackStock) { %>
   <div class="stat"><b><%= stats.soldOut %></b><span>Productos agotados</span></div>
   <div class="stat"><b><%= stats.lowStock %></b><span>Con poco stock (&le; 2)</span></div>

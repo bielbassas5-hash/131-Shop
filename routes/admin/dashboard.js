@@ -56,4 +56,19 @@ router.get(
   })
 );
 
+// Copia de seguridad completa: catalogo, temas y pedidos (contiene datos personales: guardala en sitio seguro)
+const BACKUP_TABLES = ['products', 'product_images', 'themes', 'product_themes', 'orders', 'order_items', 'order_events'];
+
+router.get(
+  '/admin/copia-seguridad.json',
+  requireAdmin,
+  wrap(async (req, res) => {
+    const data = { generado: new Date().toISOString(), version: 1 };
+    for (const table of BACKUP_TABLES) data[table] = await db.all(`SELECT * FROM ${table}`);
+    res.set('Content-Type', 'application/json; charset=utf-8');
+    res.set('Content-Disposition', `attachment; filename="copia-131-${data.generado.slice(0, 10)}.json"`);
+    res.send(JSON.stringify(data, null, 2));
+  })
+);
+
 module.exports = router;

@@ -4,7 +4,7 @@ const db = require('../../db');
 const { requireAdmin } = require('../../middleware/auth');
 const { wrap } = require('../../lib/security');
 const { text } = require('../../lib/validate');
-const { STATUSES, setStatus, StockError } = require('../../lib/orders');
+const { STATUSES, setStatus, orderEvents, StockError } = require('../../lib/orders');
 const { STATUS_LABELS } = require('../../lib/format');
 const notify = require('../../lib/notify');
 const { configured: mailConfigured } = require('../../lib/mailer');
@@ -17,14 +17,27 @@ router.get(
   requireAdmin,
   wrap(async (req, res) => {
     const estado = STATUSES.includes(req.query.estado) ? req.query.estado : '';
+    const q = typeof req.query.q === 'string' ? req.query.q.trim().slice(0, 60) : '';
+    const where = [];
+    const args = [];
+    if (estado) {
+      where.push('status = ?');
+      args.push(estado);
+    }
+    if (q) {
+      const like = `%${q.replace(/[\\%_]/g, '\\$&')}%`;
+      where.push("(CAST(id AS TEXT) = ? OR customer_name LIKE ? ESCAPE '\\' OR customer_email LIKE ? ESCAPE '\\')");
+      args.push(q.replace(/^#/, ''), like, like);
+    }
     const orders = await db.all(
-      `SELECT * FROM orders ${estado ? 'WHERE status = ?' : ''} ORDER BY created_at DESC LIMIT 300`,
-      estado ? [estado] : []
+      `SELECT * FROM orders ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY created_at DESC LIMIT 300`,
+      args
     );
     const counts = await db.all('SELECT status, COUNT(*) AS n FROM orders GROUP BY status');
     res.render('admin/orders', {
       orders,
       estado,
+      q,
       counts: Object.fromEntries(counts.map((c) => [c.status, Number(c.n)])),
       meta: { title: 'Pedidos', noindex: true },
     });
@@ -75,7 +88,10 @@ router.get(
     if (!/^\d+$/.test(req.params.id)) return res.status(404).render('error', { status: 404 });
     const order = await db.get('SELECT * FROM orders WHERE id = ?', [req.params.id]);
     if (!order) return res.status(404).render('error', { status: 404 });
-    const items = await db.all('SELECT * FROM order_items WHERE order_id = ?', [order.id]);
+    const [items, events] = await Promise.all([
+      db.all('SELECT * FROM order_items WHERE order_id = ?', [order.id]),
+      orderEvents(order.id),
+    ]);
     let shipTo = {};
     try {
       shipTo = JSON.parse(order.shipping_address || '{}');
@@ -95,6 +111,7 @@ router.get(
     res.render('admin/order-detail', {
       order,
       items,
+      events,
       shipTo,
       mailto,
       publicLink: link,

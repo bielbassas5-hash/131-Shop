@@ -16,6 +16,13 @@
       <div class="summary-row total"><span>Total</span><span><%= euro(order.total_cents) %></span></div>
     </section>
 
+    <section class="panel mb24">
+      <h2>Historial</h2>
+      <ul class="timeline">
+        <% events.forEach((e) => { %><li><span><%= STATUS_LABELS[e.status] || e.status %></span><time><%= dateTime(e.created_at) %></time></li><% }) %>
+      </ul>
+    </section>
+
     <section class="panel">
       <h2>Envío</h2>
       <dl class="kv">

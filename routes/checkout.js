@@ -1,8 +1,8 @@
 const express = require('express');
 const db = require('../db');
 const { wrap, createLimiter } = require('../lib/security');
-const { loadCart, createOrder, setStatus, paymentInfo, StockError } = require('../lib/orders');
-const { validateCheckout, allowedCountries, COUNTRY_NAMES } = require('../lib/validate');
+const { loadCart, createOrder, setStatus, paymentInfo, orderEvents, StockError } = require('../lib/orders');
+const { validateCheckout, allowedCountries, COUNTRY_NAMES, text } = require('../lib/validate');
 
 const router = express.Router();
 
@@ -10,6 +10,7 @@ const { stripe, stripeConfigured, confirmSession } = require('../lib/payments');
 const notify = require('../lib/notify');
 
 const orderLimiter = createLimiter({ windowMs: 60 * 60 * 1000, max: 20 });
+const lookupLimiter = createLimiter({ windowMs: 60 * 60 * 1000, max: 10 });
 const TOKEN_RE = /^[a-f0-9]{32}$/;
 
 function baseUrl(req) {
@@ -96,6 +97,33 @@ router.post(
   })
 );
 
+// Recuperar el enlace de un pedido con su numero y el email usado
+router.get('/pedido', (req, res) => {
+  res.render('lookup', { error: null, values: {}, meta: { title: 'Consultar mi pedido', noindex: true } });
+});
+
+router.post(
+  '/pedido',
+  lookupLimiter.middleware('Demasiadas consultas seguidas. Espera un rato e inténtalo de nuevo.'),
+  wrap(async (req, res) => {
+    const numero = text(req.body.numero, 12).replace(/^#/, '');
+    const email = text(req.body.email, 120).toLowerCase();
+    const order =
+      /^\d{1,9}$/.test(numero) && email
+        ? await db.get('SELECT token FROM orders WHERE id = ? AND lower(customer_email) = ?', [Number(numero), email])
+        : null;
+    // Mismo mensaje exista o no el numero: no se puede usar para averiguar pedidos ajenos
+    if (!order) {
+      return res.status(404).render('lookup', {
+        error: 'No encontramos ningún pedido con esos datos. Revisa el número y el email.',
+        values: { numero, email },
+        meta: { title: 'Consultar mi pedido', noindex: true },
+      });
+    }
+    res.redirect(`/pedido/${order.token}`);
+  })
+);
+
 router.get(
   '/pedido/:token',
   wrap(async (req, res) => {
@@ -119,7 +147,10 @@ router.get(
       }
     }
 
-    const items = await db.all('SELECT * FROM order_items WHERE order_id = ?', [order.id]);
+    const [items, events] = await Promise.all([
+      db.all('SELECT * FROM order_items WHERE order_id = ?', [order.id]),
+      orderEvents(order.id),
+    ]);
     let shipTo = {};
     try {
       shipTo = JSON.parse(order.shipping_address || '{}');
@@ -131,6 +162,7 @@ router.get(
     res.render('order', {
       order,
       items,
+      events,
       shipTo,
       stripeConfigured,
       bankIban: paymentInfo().iban,

@@ -117,6 +117,13 @@ async function migrate() {
       value TEXT
     );
 
+    CREATE TABLE IF NOT EXISTS order_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+      status TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
     CREATE TABLE IF NOT EXISTS sessions (
       sid TEXT PRIMARY KEY,
       data TEXT NOT NULL,
@@ -133,6 +140,12 @@ async function migrate() {
     "UPDATE orders SET token = lower(hex(randomblob(16))) WHERE token IS NULL OR token = ''"
   );
 
+  // Pedidos anteriores al historial: un evento inicial con su estado actual
+  await client.execute(
+    `INSERT INTO order_events (order_id, status, created_at)
+     SELECT id, status, created_at FROM orders o WHERE NOT EXISTS (SELECT 1 FROM order_events e WHERE e.order_id = o.id)`
+  );
+
   await client.executeMultiple(`
     CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_token ON orders(token);
     CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status, created_at);
@@ -140,6 +153,7 @@ async function migrate() {
     CREATE INDEX IF NOT EXISTS idx_product_images_product ON product_images(product_id, position);
     CREATE INDEX IF NOT EXISTS idx_products_active ON products(active, created_at);
     CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires);
+    CREATE INDEX IF NOT EXISTS idx_order_events_order ON order_events(order_id, id);
     CREATE INDEX IF NOT EXISTS idx_product_themes_theme ON product_themes(theme_id);
   `);
 }

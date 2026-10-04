@@ -51,6 +51,14 @@
       </div></div>
     <% } %>
 
+    <% if (events.length) { %>
+    <section class="panel mb24">
+      <h2>Historial</h2>
+      <ul class="timeline">
+        <% events.forEach((e) => { %><li><span><%= STATUS_LABELS[e.status] || e.status %></span><time><%= dateTime(e.created_at) %></time></li><% }) %>
+      </ul>
+    </section>
+    <% } %>
     <section class="panel">
       <h2>Datos de envío</h2>
       <dl class="kv">
