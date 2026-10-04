@@ -122,6 +122,39 @@
     });
   }
 
+  // Formulario de producto: calidad de cada formato segun la resolucion de la imagen
+  var formatsBox = document.querySelector('[data-formats]');
+  var wInput = document.getElementById('source_width');
+  var hInput = document.getElementById('source_height');
+  var LEVEL_LABELS = { optima: 'Calidad óptima', aceptable: 'Calidad aceptable', baja: 'Resolución baja' };
+  function refreshQuality(autoCheck) {
+    if (!formatsBox || !wInput || !hInput) return;
+    var w = parseInt(wInput.value, 10);
+    var h = parseInt(hInput.value, 10);
+    var hint = formatsBox.querySelector('[data-dims-hint]');
+    if (hint) hint.textContent = w > 0 && h > 0 ? 'Resolución de la imagen: ' + w + ' × ' + h + ' px.' : 'Al elegir la imagen verás qué formatos permite con buena calidad.';
+    formatsBox.querySelectorAll('.format-row').forEach(function (row) {
+      var q = row.querySelector('[data-quality]');
+      if (!(w > 0 && h > 0)) {
+        q.textContent = '';
+        q.className = 'quality';
+        return;
+      }
+      var shortMm = parseFloat(row.getAttribute('data-short-mm'));
+      var longMm = parseFloat(row.getAttribute('data-long-mm'));
+      var ppp = Math.floor(Math.min(Math.min(w, h) / (shortMm / 25.4), Math.max(w, h) / (longMm / 25.4)));
+      var level = ppp >= 300 ? 'optima' : ppp >= 200 ? 'aceptable' : 'baja';
+      q.textContent = LEVEL_LABELS[level] + ' (' + ppp + ' ppp)';
+      q.className = 'quality q-' + level;
+      // En un producto nuevo se proponen solo los formatos con calidad optima
+      if (autoCheck) row.querySelector('input[type="checkbox"]').checked = level === 'optima';
+    });
+  }
+  if (wInput && hInput) {
+    wInput.addEventListener('input', function () { refreshQuality(false); });
+    hInput.addEventListener('input', function () { refreshQuality(false); });
+  }
+
   // Vista previa de la imagen en el formulario de producto
   var fileInput = document.querySelector('input[type="file"][data-preview]');
   if (fileInput) {
@@ -131,6 +164,16 @@
       if (!file || !img) return;
       img.src = URL.createObjectURL(file);
       img.hidden = false;
+      // Tamaño en pixeles del archivo elegido -> calidad de cada formato
+      if (wInput && hInput) {
+        var probe = new Image();
+        probe.onload = function () {
+          wInput.value = probe.naturalWidth;
+          hInput.value = probe.naturalHeight;
+          refreshQuality(formatsBox && formatsBox.hasAttribute('data-autocheck'));
+        };
+        probe.src = img.src;
+      }
     });
   }
 })();

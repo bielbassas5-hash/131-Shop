@@ -45,12 +45,36 @@
       <% } %>
     </div>
   </div>
-  <div class="field">
-    <label for="variants_text">Formatos con precio propio (opcional)</label>
-    <textarea id="variants_text" name="variants_text" class="short" maxlength="700" placeholder="A4: 18,00&#10;A3: 28,00"><%= variantsText %></textarea>
-    <p class="field-hint">Una línea por formato, con el nombre y el precio separados por dos puntos. Si los rellenas, el cliente elige formato y el precio base pasa a ser el más barato (no hace falta el campo "Precio"). Máximo 8.</p>
+  <fieldset class="field method-box formats-box" data-formats<%= product ? '' : ' data-autocheck' %>>
+    <legend>Formatos y precios (opcional)</legend>
+    <p class="field-hint" data-dims-hint><%= dims ? 'Resolución de la imagen: ' + dims.width + ' × ' + dims.height + ' px.' : 'Al elegir la imagen verás qué formatos permite con buena calidad.' %></p>
+    <div class="format-rows">
+      <% formatRows.forEach((r) => { %>
+        <div class="format-row" data-short-mm="<%= Math.min(...r.mm) %>" data-long-mm="<%= Math.max(...r.mm) %>">
+          <label class="check"><input type="checkbox" name="fmt" value="<%= r.id %>"<%= r.checked ? ' checked' : '' %> /><span><b><%= r.label %></b></span></label>
+          <input type="text" inputmode="decimal" name="fmt_price_<%= r.id %>" value="<%= r.price %>" placeholder="Precio €" aria-label="Precio del formato <%= r.id %>" />
+          <span class="quality<%= r.level ? ' q-' + r.level : '' %>" data-quality><%= r.level ? r.levelLabel + ' (' + r.ppp + ' ppp)' : '' %></span>
+        </div>
+      <% }) %>
+    </div>
+    <div class="row2">
+      <div>
+        <label for="source_width">Ancho del archivo original (px)</label>
+        <input id="source_width" type="number" name="source_width" min="1" max="30000" value="<%= dims ? dims.width : '' %>" />
+      </div>
+      <div>
+        <label for="source_height">Alto del archivo original (px)</label>
+        <input id="source_height" type="number" name="source_height" min="1" max="30000" value="<%= dims ? dims.height : '' %>" />
+      </div>
+    </div>
+    <p class="field-hint">Se rellena solo al elegir la imagen. Corrígelo si subes una versión reducida y guardas el archivo grande aparte. La tienda guarda una versión web de la imagen: para imprimir se usa tu archivo original. Calidad: óptima desde 300 ppp, aceptable desde 200 ppp.</p>
+    <div>
+      <label for="variants_text">Otros formatos (una línea cada uno)</label>
+      <textarea id="variants_text" name="variants_text" class="short" maxlength="700" placeholder="Marco 30x40: 35,00"><%= variantsText %></textarea>
+      <p class="field-hint">Para tamaños que no son A5-A1. Si activas algún formato, el cliente elige uno y el precio base pasa a ser el más barato (no hace falta el campo "Precio"). Máximo <%= maxVariants %> en total.</p>
+    </div>
     <%- err('variants') %>
-  </div>
+  </fieldset>
   <div class="field">
     <label for="type">Tipo</label>
     <select id="type" name="type">

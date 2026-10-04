@@ -6,7 +6,8 @@ const { deleteImage, UserError } = require('../../lib/imageStorage');
 const { MAX_EXTRAS, extrasOf, validateFiles, saveMany, addExtras, removeExtras, removeAllExtras } = require('../../lib/productImages');
 const { wrap } = require('../../lib/security');
 const { validateProduct } = require('../../lib/validate');
-const { parseVariantsText, toText, variantsOf, replaceVariants } = require('../../lib/variants');
+const { MAX_VARIANTS, parseVariantsText, toText, variantsOf, replaceVariants } = require('../../lib/variants');
+const formats = require('../../lib/formats');
 const themesLib = require('../../lib/themes');
 const classify = require('../../lib/classify');
 const { uploadImages, pickFiles } = require('./shared');
@@ -48,21 +49,113 @@ async function applyThemes(product, body, { buffer } = {}) {
 const describeDetection = (d) =>
   d && d.names.length ? ` Temas detectados ${d.source === 'ai' ? 'con IA' : 'por palabras clave'}: ${d.names.join(', ')}.` : '';
 
-// Lee y valida el formulario de producto, incluidos los formatos ("A4: 18,00" por linea)
+const priceText = (cents) => (cents / 100).toFixed(2).replace('.', ',');
+
+// Lee y valida el formulario de producto. Formatos: estandar (casilla + precio) y otros (una linea "A4: 18,00")
 function readProduct(body) {
-  const parsed = parseVariantsText(body.variants_text);
-  const v = validateProduct(body, { hasVariants: parsed.variants.length > 0 });
+  const chosen = [].concat(body.fmt || []).map(String);
+  const fmtPrices = {};
+  const variants = [];
+  const problems = [];
+
+  for (const p of formats.PRESETS) {
+    const raw = typeof body[`fmt_price_${p.id}`] === 'string' ? body[`fmt_price_${p.id}`].trim().slice(0, 12) : '';
+    fmtPrices[p.id] = raw;
+    if (!chosen.includes(p.id)) continue;
+    const priceStr = raw.replace(',', '.');
+    const price = Number(priceStr);
+    if (!/^\d+(\.\d{1,2})?$/.test(priceStr) || price <= 0 || price > 10000) {
+      problems.push(`Indica un precio válido para ${p.id}.`);
+      continue;
+    }
+    variants.push({ label: p.label, price_cents: Math.round(price * 100) });
+  }
+
+  const custom = parseVariantsText(body.variants_text);
+  problems.push(...custom.errors);
+  for (const c of custom.variants) {
+    if (variants.some((v) => v.label.toLowerCase() === c.label.toLowerCase())) problems.push(`El formato "${c.label}" está repetido.`);
+    else variants.push(c);
+  }
+  if (variants.length > MAX_VARIANTS) problems.push(`Máximo ${MAX_VARIANTS} formatos.`);
+
+  const v = validateProduct(body, { hasVariants: variants.length > 0 });
   v.values.variants_text = typeof body.variants_text === 'string' ? body.variants_text.slice(0, 700) : '';
-  if (parsed.errors.length) {
-    v.errors.variants = parsed.errors.join(' ');
+  v.values.fmt = chosen.filter((id) => formats.PRESETS.some((p) => p.id === id));
+  v.values.fmt_prices = fmtPrices;
+  v.values.source_width = typeof body.source_width === 'string' ? body.source_width.trim().slice(0, 6) : '';
+  v.values.source_height = typeof body.source_height === 'string' ? body.source_height.trim().slice(0, 6) : '';
+  if (problems.length) {
+    v.errors.variants = problems.join(' ');
     v.ok = false;
   }
-  return { v, variants: parsed.variants };
+  return { v, variants };
 }
+
+// Resolucion del original: la que escribe el administrador (o rellena el navegador al elegir el archivo),
+// si no la detectada en el archivo subido, si no la que ya estaba guardada.
+function resolveDims(values, buffer, existing) {
+  const num = (x) => Number(x);
+  const typed = formats.valid(num(values.source_width), num(values.source_height))
+    ? { width: num(values.source_width), height: num(values.source_height) }
+    : null;
+  const stored = existing && existing.source_width ? { width: num(existing.source_width), height: num(existing.source_height) } : null;
+  const detected = buffer ? formats.imageSize(buffer) : null;
+  const typedChanged = typed && (!stored || typed.width !== stored.width || typed.height !== stored.height);
+  return (typedChanged && typed) || detected || typed || stored || null;
+}
+
+// Aviso si se activa un formato para el que la imagen no tiene resolucion suficiente
+function qualityWarning(variants, dims) {
+  if (!dims) return '';
+  const low = [];
+  for (const vr of variants) {
+    const p = formats.presetOfLabel(vr.label);
+    const a = p && formats.assess(dims, p);
+    if (a && a.level === 'baja') low.push(`${p.id} (${a.ppp} ppp)`);
+  }
+  return low.length ? ` Atención: resolución baja para ${low.join(', ')} (la imagen mide ${dims.width} × ${dims.height} px).` : '';
+}
+
+const lastPriceText = async (label) => {
+  const row = await db.get('SELECT price_cents FROM product_variants WHERE label = ? ORDER BY id DESC LIMIT 1', [label]);
+  return row ? priceText(Number(row.price_cents)) : '';
+};
 
 async function renderForm(res, { product = null, form = null, errors = {}, error = null, status = 200 }) {
   const extras = product ? await extrasOf(product.id) : [];
-  const variantsText = form && form.variants_text !== undefined ? form.variants_text : product ? toText(await variantsOf(product.id)) : '';
+
+  // Formatos: casillas estandar + lo demas en el cuadro de texto
+  const chosen = new Map();
+  let variantsText = '';
+  if (form) {
+    for (const id of form.fmt || []) chosen.set(id, (form.fmt_prices || {})[id] || '');
+    variantsText = form.variants_text || '';
+  } else if (product) {
+    const others = [];
+    for (const vr of await variantsOf(product.id)) {
+      const p = formats.presetOfLabel(vr.label);
+      if (p) chosen.set(p.id, priceText(Number(vr.price_cents)));
+      else others.push(vr);
+    }
+    variantsText = toText(others);
+  }
+  const formW = form ? Number(form.source_width) : Number(product && product.source_width);
+  const formH = form ? Number(form.source_height) : Number(product && product.source_height);
+  const dims = formats.valid(formW, formH) ? { width: formW, height: formH } : null;
+  const formatRows = [];
+  for (const p of formats.PRESETS) {
+    const a = formats.assess(dims, p);
+    formatRows.push({
+      ...p,
+      checked: chosen.has(p.id),
+      price: chosen.has(p.id) ? chosen.get(p.id) : await lastPriceText(p.label), // propone el ultimo precio usado
+      ppp: a && a.ppp,
+      level: a && a.level,
+      levelLabel: a && formats.QUALITY_LABELS[a.level],
+    });
+  }
+
   const allThemes = await themesLib.allThemes();
   const selectedThemeIds = form && form.themeIds ? form.themeIds : product ? (await themesLib.themesOf(product.id)).map((t) => Number(t.id)) : [];
   res.status(status).render('admin/product-form', {
@@ -72,6 +165,9 @@ async function renderForm(res, { product = null, form = null, errors = {}, error
     error,
     extras,
     variantsText,
+    formatRows,
+    dims,
+    maxVariants: MAX_VARIANTS,
     maxExtras: MAX_EXTRAS,
     allThemes,
     selectedThemeIds,
@@ -104,10 +200,11 @@ router.post(
       return renderForm(res, { form: { ...v.values, ...themeForm(req.body) }, errors: v.errors, error: err.message, status: 400 });
     }
 
+    const dims = resolveDims(v.values, cover.buffer, null);
     const created = await db.run(
-      `INSERT INTO products (title, description, price_cents, image_path, type, stock, active)
-       VALUES (?, ?, ?, ?, ?, ?, 1)`,
-      [v.values.title, v.values.description, v.price_cents, coverPath, v.values.type, v.stock]
+      `INSERT INTO products (title, description, price_cents, image_path, type, stock, active, source_width, source_height)
+       VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+      [v.values.title, v.values.description, v.price_cents, coverPath, v.values.type, v.stock, dims ? dims.width : null, dims ? dims.height : null]
     );
     await addExtras(created.lastInsertRowid, extraPaths);
     if (variants.length) await replaceVariants(created.lastInsertRowid, variants);
@@ -116,7 +213,7 @@ router.post(
       req.body,
       { buffer: cover.buffer }
     );
-    req.session.flash = { type: 'success', msg: `"${v.values.title}" publicado.${describeDetection(detection)}` };
+    req.session.flash = { type: 'success', msg: `"${v.values.title}" publicado.${describeDetection(detection)}${qualityWarning(variants, dims)}` };
     res.redirect('/admin');
   })
 );
@@ -176,10 +273,12 @@ router.post(
     }
 
     const image_path = coverPath || product.image_path;
+    const dims = resolveDims(v.values, cover ? cover.buffer : null, product);
     await db.run(
-      `UPDATE products SET title = ?, description = ?, price_cents = ?, image_path = ?, type = ?, stock = ?, active = ?
+      `UPDATE products SET title = ?, description = ?, price_cents = ?, image_path = ?, type = ?, stock = ?, active = ?,
+         source_width = ?, source_height = ?
        WHERE id = ?`,
-      [v.values.title, v.values.description, v.price_cents, image_path, v.values.type, v.stock, active ? 1 : 0, product.id]
+      [v.values.title, v.values.description, v.price_cents, image_path, v.values.type, v.stock, active ? 1 : 0, dims ? dims.width : null, dims ? dims.height : null, product.id]
     );
     if (coverPath) await deleteImage(product.image_path);
     await removeExtras(product.id, removeIds);
@@ -190,7 +289,7 @@ router.post(
       req.body,
       { buffer: cover ? cover.buffer : undefined }
     );
-    req.session.flash = { type: 'success', msg: `Cambios guardados.${describeDetection(detection)}` };
+    req.session.flash = { type: 'success', msg: `Cambios guardados.${describeDetection(detection)}${qualityWarning(variants, dims)}` };
     res.redirect('/admin');
   })
 );

@@ -868,6 +868,65 @@ async function main() {
     check('el carrito con un formato retirado se limpia solo', vcAfter.text.includes('vacío') && vcAfter.text.includes('ajustado'));
     check('eliminar un producto con formatos', (await admin.post(`/admin/productos/${otherId}/eliminar`, { _csrf: tok })).status === 302 && (await anon.get(`/producto/${otherId}`)).status === 404);
 
+    console.log('\n# Formatos estandar y calidad segun la resolucion');
+    // Lectura del tamaño en pixeles desde la cabecera de cada tipo de archivo
+    const fmtLib = require('../lib/formats');
+    const pngHead = (w, h) => { const b = Buffer.alloc(64); b[0] = 0x89; b.write('PNG', 1, 'ascii'); b.writeUInt32BE(w, 16); b.writeUInt32BE(h, 20); return b; };
+    const gifHead = Buffer.alloc(40); gifHead.write('GIF89a', 0, 'ascii'); gifHead.writeUInt16LE(640, 6); gifHead.writeUInt16LE(480, 8);
+    const jpgHead = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]), Buffer.alloc(14), Buffer.from([0xff, 0xc0, 0x00, 0x11, 0x08, 0x0d, 0xb4, 0x09, 0xb0]), Buffer.alloc(20)]);
+    const webpX = Buffer.alloc(40); webpX.write('RIFF', 0, 'ascii'); webpX.write('WEBP', 8, 'ascii'); webpX.write('VP8X', 12, 'ascii'); webpX.writeUIntLE(1999, 24, 3); webpX.writeUIntLE(2999, 27, 3);
+    check('lee el tamaño de un PNG', JSON.stringify(fmtLib.imageSize(pngHead(3508, 4961))) === '{"width":3508,"height":4961}');
+    check('lee el tamaño de un JPEG', JSON.stringify(fmtLib.imageSize(jpgHead)) === '{"width":2480,"height":3508}');
+    check('lee el tamaño de un GIF', JSON.stringify(fmtLib.imageSize(gifHead)) === '{"width":640,"height":480}');
+    check('lee el tamaño de un WEBP', JSON.stringify(fmtLib.imageSize(webpX)) === '{"width":2000,"height":3000}');
+    check('datos corruptos o dimensiones absurdas -> null', fmtLib.imageSize(Buffer.from('no soy imagen, solo texto de relleno largo')) === null && fmtLib.imageSize(pngHead(0, 5)) === null && fmtLib.imageSize(pngHead(99999, 10)) === null);
+    check('calidad: 3508x4961 da 300 ppp en A3 y 149 ppp en A1', fmtLib.assess({ width: 3508, height: 4961 }, fmtLib.PRESETS[2]).level === 'optima' && fmtLib.assess({ width: 3508, height: 4961 }, fmtLib.PRESETS[4]).level === 'baja');
+
+    const bigPng = { data: pngHead(3508, 4961), type: 'image/png', name: 'grande.png' };
+    const fcreate = (fields, file = bigPng) =>
+      admin.req('POST', `/admin/productos/nuevo?_csrf=${tok}`, { multipart: productForm({ title: 'Lamina A', description: 'x', type: 'print', stock: '5', price: '', ...fields }, file) });
+    check('precio vacio en un formato activado -> error', (await fcreate({ fmt: ['A4'], fmt_price_A4: '' })).status === 400);
+    check('precio no valido en un formato activado -> error', (await fcreate({ fmt: ['A3'], fmt_price_A3: 'abc' })).status === 400);
+    check('formato estandar repetido en "otros" -> error', (await fcreate({ fmt: ['A4'], fmt_price_A4: '18', variants_text: 'A4 (21 × 29,7 cm): 10' })).status === 400);
+    check('ids de formato inventados se ignoran (y sin precio da error)', (await fcreate({ fmt: ['A9', '__proto__'], fmt_price_A9: '5' })).status === 400);
+
+    const fCreated = await fcreate({ fmt: ['A4', 'A3', 'A1'], fmt_price_A4: '18', fmt_price_A3: '28,00', fmt_price_A1: '80', variants_text: 'Marco 30x40: 35' });
+    check('producto con A4, A3, A1 y un formato propio creado', fCreated.status === 302);
+    const adminHome = (await admin.get('/admin')).text;
+    check('aviso de resolucion baja para el A1 (solo para ese)', /Atención: resolución baja para A1 \(149 ppp\)[^<]*3508 × 4961 px/.test(adminHome) && !/baja para A1 \(149 ppp\), A3/.test(adminHome));
+    const fId = (await anon.get('/?q=Lamina')).text.match(/\/producto\/(\d+)-lamina-a/)[1];
+    const fpage = (await anon.get(`/producto/${fId}`)).text;
+    check('la ficha ofrece los formatos con su medida', fpage.includes('A4 (21 × 29,7 cm)') && fpage.includes('A3 (29,7 × 42 cm)') && fpage.includes('Marco 30x40') && /id="product-price">18,00\s€/.test(fpage));
+    const fedit = (await admin.get(`/admin/productos/${fId}/editar`)).text;
+    check('el formulario recuerda formatos activados y precios', /name="fmt" value="A4" checked/.test(fedit) && /name="fmt_price_A3" value="28,00"/.test(fedit) && /name="fmt" value="A1" checked/.test(fedit) && !/name="fmt" value="A2" checked/.test(fedit));
+    check('el formulario muestra la calidad de cada formato', fedit.includes('3508 × 4961 px') && /Calidad óptima \(300 ppp\)/.test(fedit) && /Calidad aceptable \(212 ppp\)/.test(fedit) && /Resolución baja \(149 ppp\)/.test(fedit));
+    check('"otros formatos" solo contiene los no estandar', /<textarea[^>]*id="variants_text"[^>]*>Marco 30x40: 35,00<\/textarea>/.test(fedit));
+    check('se propone el ultimo precio usado en un producto nuevo', /name="fmt_price_A4" value="18,00"/.test((await admin.get('/admin/productos/nuevo')).text));
+
+    // Carrito: el nombre incluye la medida
+    const fb = new Client();
+    const fbt = await fb.csrf(`/producto/${fId}`);
+    const a3Id = [...fpage.matchAll(/name="variant" value="(\d+)"[^>]*data-price-label="[^"]*"[^>]*\/>\s*<span>A3/g)].map((m) => m[1])[0];
+    await fb.post(`/agregar/${fId}`, { _csrf: fbt, back: '/', variant: a3Id });
+    const fcart = (await fb.get('/carrito')).text;
+    check('el carrito muestra el formato con su medida y precio', fcart.includes('Lamina A · A3 (29,7 × 42 cm)') && /28,00\s€/.test(fcart));
+
+    // Correccion manual de la resolucion (se sube una version reducida y el original es grande aparte)
+    const fixDims = await admin.req('POST', `/admin/productos/${fId}/editar?_csrf=${tok}`, {
+      multipart: productForm({ title: 'Lamina A', description: 'x', type: 'print', stock: '5', active: '1', price: '', fmt: ['A4'], fmt_price_A4: '18', source_width: '1000', source_height: '1400' }),
+    });
+    check('corregir la resolucion a mano', fixDims.status === 302);
+    const afterFix = (await admin.get(`/admin/productos/${fId}/editar`)).text;
+    check('la calidad se recalcula con la resolucion corregida (A4 con 1000x1400 = 119 ppp)', afterFix.includes('1000 × 1400 px') && /Resolución baja \(119 ppp\)/.test(afterFix));
+    check('al quitar A3 y el formato propio solo queda A4', !/name="fmt" value="A3" checked/.test(afterFix) && /name="fmt" value="A4" checked/.test(afterFix));
+
+    // Sin resolucion conocida (imagen de 1x1) no se inventa ninguna calidad
+    const tiny = { data: PNG, type: 'image/png', name: 't.png' };
+    await fcreate({ title: 'Sin medidas', fmt: ['A4'], fmt_price_A4: '10' }, tiny);
+    const noDimsId = (await anon.get('/?q=Sin+medidas')).text.match(/\/producto\/(\d+)-sin-medidas/)[1];
+    const noDimsForm = (await admin.get(`/admin/productos/${noDimsId}/editar`)).text;
+    check('con una imagen minima (1x1) la calidad sale como baja, sin errores', /Resolución baja/.test(noDimsForm) && !/NaN|undefined/.test(noDimsForm));
+
     console.log('\n# Temas');
     const formPage = (await admin.get('/admin/productos/nuevo')).text;
     check('temas basicos disponibles en el formulario', ['Montañas', 'Retratos', 'Animales', 'Paisajes'].every((n) => formPage.includes(n)));

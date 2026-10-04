@@ -480,3 +480,13 @@ dialog.lightbox .lb-close { position: fixed; top: 14px; right: 14px; width: 44px
 .variant-opt input:checked + span { border-color: var(--text); box-shadow: inset 0 0 0 1px var(--text); }
 .variant-opt input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
 .variant-opt:hover span { border-color: var(--text); }
+
+/* ---------- Formatos estandar en el formulario ---------- */
+.format-rows { display: grid; gap: 8px; }
+.format-row { display: grid; grid-template-columns: minmax(150px, 1.2fr) 120px minmax(160px, 1fr); gap: 10px 14px; align-items: center; }
+.format-row input[type='text'] { min-height: 40px; padding: 8px 12px; }
+.quality { font-size: .82rem; font-weight: 600; color: var(--muted); }
+.quality.q-optima { color: var(--ok); }
+.quality.q-aceptable { color: var(--warn); }
+.quality.q-baja { color: var(--danger); }
+@media (max-width: 560px) { .format-row { grid-template-columns: 1fr 110px; } .format-row .quality { grid-column: 1 / -1; } }
