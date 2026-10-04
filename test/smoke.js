@@ -690,6 +690,10 @@ async function main() {
     const galId = (await anon.get('/?q=galeria')).text.match(/\/producto\/(\d+)/)[1];
     const galPage = await anon.get(`/producto/${galId}`);
     check('ficha muestra 3 miniaturas', (galPage.text.match(/data-gallery-src/g) || []).length === 3);
+    check('la ficha permite ampliar la imagen (lightbox)', /data-lightbox/.test(galPage.text) && /<dialog class="lightbox"/.test(galPage.text) && /data-gallery-full=/.test(galPage.text));
+    check('la tarjeta incluye la segunda imagen para el hover', /<img class="alt"/.test((await anon.get('/?q=galeria')).text));
+    check('hay boton de cambio de tema y el script de arranque', /data-theme-toggle/.test(galPage.text) && /theme-init\.js/.test(galPage.text));
+    check('el script de tema esta disponible', (await anon.get('/js/theme-init.js')).status === 200);
     const editPage = await admin.get(`/admin/productos/${galId}/editar`);
     const extraIds = [...editPage.text.matchAll(/name="remove_extra" value="(\d+)"/g)].map((m) => m[1]);
     check('editor lista los extras', extraIds.length === 2);
