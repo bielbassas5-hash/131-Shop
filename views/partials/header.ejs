@@ -34,6 +34,7 @@
       <a href="/" class="logo" aria-label="<%= artistName %> - inicio"><%= artistName %><i>.</i></a>
       <nav class="nav" aria-label="Principal">
         <a href="/" <%- currentPath === '/' ? 'aria-current="page"' : '' %>>Tienda</a>
+        <a href="/temas" <%- currentPath === '/temas' || currentPath.startsWith('/tema/') ? 'aria-current="page"' : '' %>>Temas</a>
         <% if (isAdmin) { %><a href="/admin" class="admin-pill">Panel</a><% } %>
         <a href="/carrito" class="cart-link" aria-label="Carrito, <%= cartCount %> artículos">
           Carrito

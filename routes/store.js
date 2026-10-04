@@ -3,6 +3,7 @@ const db = require('../db');
 const { wrap } = require('../lib/security');
 const { TYPES, TYPE_LABELS, TYPE_PLURALS } = require('../lib/format');
 const { extrasOf } = require('../lib/productImages');
+const themesLib = require('../lib/themes');
 
 const router = express.Router();
 
@@ -12,39 +13,86 @@ const SORTS = {
   precio_desc: 'price_cents DESC',
 };
 
+const SLUG_RE = /^[a-z0-9-]{1,40}$/;
+
+// Catalogo con filtros. `theme` (opcional) agrupa solo los productos de ese tema.
+async function renderCatalog(req, res, theme) {
+  const tipo = TYPES.includes(req.query.tipo) ? req.query.tipo : '';
+  const orden = SORTS[req.query.orden] ? req.query.orden : 'nuevo';
+  const q = typeof req.query.q === 'string' ? req.query.q.trim().slice(0, 40) : '';
+
+  const where = ['active = 1'];
+  const args = [];
+  if (theme) {
+    where.push('EXISTS (SELECT 1 FROM product_themes pt WHERE pt.product_id = products.id AND pt.theme_id = ?)');
+    args.push(theme.id);
+  }
+  if (tipo) {
+    where.push('type = ?');
+    args.push(tipo);
+  }
+  if (q) {
+    where.push("(title LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\')");
+    const like = `%${q.replace(/[\\%_]/g, '\\$&')}%`;
+    args.push(like, like);
+  }
+
+  const products = await db.all(
+    `SELECT * FROM products WHERE ${where.join(' AND ')}
+     ORDER BY (stock > 0) DESC, ${SORTS[orden]} LIMIT 120`,
+    args
+  );
+
+  res.render('index', {
+    products,
+    theme,
+    themes: await themesLib.publicThemes(),
+    filters: { tipo, orden, q, tema: theme ? theme.slug : '' },
+    meta: {
+      title: theme ? theme.name : tipo ? TYPE_PLURALS[tipo] : 'Tienda',
+      description: theme ? `${theme.name}: dibujos, prints y stickers de 131.` : 'Dibujos, prints y stickers de 131.',
+    },
+  });
+}
+
+router.get('/', wrap((req, res) => renderCatalog(req, res, null)));
+
 router.get(
-  '/',
+  '/tema/:slug',
   wrap(async (req, res) => {
-    const tipo = TYPES.includes(req.query.tipo) ? req.query.tipo : '';
-    const orden = SORTS[req.query.orden] ? req.query.orden : 'nuevo';
-    const q = typeof req.query.q === 'string' ? req.query.q.trim().slice(0, 40) : '';
+    const theme = SLUG_RE.test(req.params.slug) ? await themesLib.themeBySlug(req.params.slug) : null;
+    if (!theme) return res.status(404).render('error', { status: 404 });
+    return renderCatalog(req, res, theme);
+  })
+);
 
-    const where = ['active = 1'];
-    const args = [];
-    if (tipo) {
-      where.push('type = ?');
-      args.push(tipo);
-    }
-    if (q) {
-      where.push("(title LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\')");
-      const like = `%${q.replace(/[\\%_]/g, '\\$&')}%`;
-      args.push(like, like);
-    }
-
-    const products = await db.all(
-      `SELECT * FROM products WHERE ${where.join(' AND ')}
-       ORDER BY (stock > 0) DESC, ${SORTS[orden]} LIMIT 120`,
-      args
+// Vista agrupada: cada tema con sus productos
+router.get(
+  '/temas',
+  wrap(async (req, res) => {
+    const rows = await db.all(
+      `SELECT p.*, t.id AS theme_id, t.name AS theme_name, t.slug AS theme_slug
+       FROM products p
+       JOIN product_themes pt ON pt.product_id = p.id
+       JOIN themes t ON t.id = pt.theme_id
+       WHERE p.active = 1
+       ORDER BY t.name COLLATE NOCASE, (p.stock > 0) DESC, p.created_at DESC`
     );
-
-    res.render('index', {
-      products,
-      filters: { tipo, orden, q },
-      meta: {
-        title: tipo ? TYPE_PLURALS[tipo] : 'Tienda',
-        description:
-          'Dibujos, prints y stickers de 131.',
-      },
+    const groups = [];
+    const byId = new Map();
+    for (const r of rows) {
+      let g = byId.get(r.theme_id);
+      if (!g) {
+        g = { name: r.theme_name, slug: r.theme_slug, total: 0, products: [] };
+        byId.set(r.theme_id, g);
+        groups.push(g);
+      }
+      g.total += 1;
+      if (g.products.length < 8) g.products.push(r);
+    }
+    res.render('themes', {
+      groups,
+      meta: { title: 'Temas', description: 'Dibujos, prints y stickers de 131 agrupados por tema.' },
     });
   })
 );
@@ -56,10 +104,14 @@ router.get(
     const product = await db.get('SELECT * FROM products WHERE id = ? AND active = 1', [req.params.id]);
     if (!product) return res.status(404).render('error', { status: 404 });
 
+    const productThemes = await themesLib.themesOf(product.id);
+    // Relacionados: primero los que comparten tema, luego el mismo tipo
     const related = await db.all(
-      `SELECT * FROM products WHERE active = 1 AND stock > 0 AND id != ?
-       ORDER BY (type = ?) DESC, created_at DESC LIMIT 4`,
-      [product.id, product.type]
+      `SELECT * FROM products p WHERE p.active = 1 AND p.stock > 0 AND p.id != ?
+       ORDER BY (SELECT COUNT(*) FROM product_themes a JOIN product_themes b ON a.theme_id = b.theme_id
+                 WHERE a.product_id = p.id AND b.product_id = ?) DESC,
+                (p.type = ?) DESC, p.created_at DESC LIMIT 4`,
+      [product.id, product.id, product.type]
     );
 
     const extras = await extrasOf(product.id);
@@ -67,6 +119,7 @@ router.get(
 
     res.render('product', {
       product,
+      productThemes,
       related,
       gallery,
       meta: {
@@ -109,9 +162,10 @@ router.get(
   wrap(async (req, res) => {
     const base = siteUrl(req);
     const products = await db.all('SELECT id, created_at FROM products WHERE active = 1');
-    const urls = [`<url><loc>${base}/</loc></url>`].concat(
-      products.map((p) => `<url><loc>${base}/producto/${p.id}</loc></url>`)
-    );
+    const themes = await themesLib.publicThemes();
+    const urls = [`<url><loc>${base}/</loc></url>`, `<url><loc>${base}/temas</loc></url>`]
+      .concat(themes.map((t) => `<url><loc>${base}/tema/${t.slug}</loc></url>`))
+      .concat(products.map((p) => `<url><loc>${base}/producto/${p.id}</loc></url>`));
     res
       .type('application/xml')
       .send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls.join('')}</urlset>`);

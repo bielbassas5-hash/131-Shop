@@ -89,6 +89,35 @@ async function waitForServer(base = BASE) {
 }
 
 const MAIL_PORT = 3057;
+const AI_PORT = 3059;
+const aiCalls = [];
+// Imita POST /v1/messages: responde segun el titulo que reciba en el prompt
+function startAiServer() {
+  const srv = http.createServer((req, res) => {
+    let b = '';
+    req.on('data', (d) => (b += d));
+    req.on('end', () => {
+      let body = {};
+      try { body = JSON.parse(b); } catch (_) { /* ignorado */ }
+      aiCalls.push({ url: req.url, headers: req.headers, body });
+      const userText = JSON.stringify(body.messages || []);
+      if (userText.includes('IA-ERROR')) {
+        res.writeHead(500, { 'content-type': 'application/json' });
+        return res.end(JSON.stringify({ type: 'error', error: { type: 'api_error', message: 'boom' } }));
+      }
+      let temas = ['Abstracto'];
+      if (userText.includes('Hostil')) temas = ['Montañas', '<img src=x onerror=alert(1)>', 'Gatos de la calle', 'Montañas'];
+      else if (userText.includes('Pico nevado')) temas = ['Montañas'];
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({
+        id: 'msg_test', type: 'message', role: 'assistant', model: 'claude-opus-5-5', stop_sequence: null,
+        content: [{ type: 'text', text: JSON.stringify({ temas }) }],
+        stop_reason: 'end_turn', usage: { input_tokens: 5, output_tokens: 5 },
+      }));
+    });
+  });
+  return new Promise((r) => srv.listen(AI_PORT, '127.0.0.1', () => r(srv)));
+}
 const mails = [];
 function startMailServer() {
   const srv = http.createServer((req, res) => {
@@ -118,6 +147,8 @@ const baseEnv = () => ({
   OWNER_EMAIL: 'owner@example.com',
   MAIL_API_URL: `http://127.0.0.1:${MAIL_PORT}/send`,
   SITE_URL: 'https://tienda.test',
+  ANTHROPIC_API_KEY: 'test-anthropic-key',
+  ANTHROPIC_BASE_URL: `http://127.0.0.1:${AI_PORT}`,
 });
 
 // Segunda instancia con Stripe configurado: webhook firmado y fallos del proveedor.
@@ -303,6 +334,7 @@ async function suiteProdAndMigration() {
 
 async function main() {
   const mailSrv = await startMailServer();
+  const aiSrv = await startAiServer();
   const server = spawn(process.execPath, ['server.js'], {
     cwd: path.join(__dirname, '..'),
     env: {
@@ -550,6 +582,100 @@ async function main() {
 
     check('eliminar producto borra portada y extras', (await admin.post(`/admin/productos/${galId}/eliminar`, { _csrf: tok })).status === 302 && countUploads() === baseline);
 
+    console.log('\n# Temas');
+    const formPage = (await admin.get('/admin/productos/nuevo')).text;
+    check('temas basicos disponibles en el formulario', ['Montañas', 'Retratos', 'Animales', 'Paisajes'].every((n) => formPage.includes(n)));
+    const themeId = (html, name) => {
+      const m = html.match(new RegExp('name="themes" value="(\\d+)"[^>]*/><span>' + name + '</span>'));
+      return m ? m[1] : null;
+    };
+    const mk = (fields) => admin.req('POST', `/admin/productos/nuevo?_csrf=${tok}`, { multipart: productForm(fields, png(0)) });
+    const base0 = { description: '', price: '9', stock: '2', type: 'print' };
+
+    // 1) IA: el SDK envia la imagen y el esquema; la respuesta se aplica
+    aiCalls.length = 0;
+    const r1 = await mk({ ...base0, title: 'Pico nevado', description: 'Cumbre en invierno', auto_themes: '1' });
+    check('crear con deteccion automatica (IA)', r1.status === 302);
+    const call = aiCalls[0] || { headers: {}, body: {} };
+    const content = ((call.body.messages || [])[0] || {}).content || [];
+    check('la peticion usa la clave de API', call.headers['x-api-key'] === 'test-anthropic-key');
+    check('modelo claude-opus-5-5 con esfuerzo bajo', call.body.model === 'claude-opus-5-5' && (call.body.output_config || {}).effort === 'low');
+    check('salida estructurada (json_schema)', ((call.body.output_config || {}).format || {}).type === 'json_schema');
+    check('fallbacks por defecto activado', call.body.fallbacks === 'default' && /server-side-fallback-2026-07-01/.test(call.headers['anthropic-beta'] || ''));
+    check('se envia la imagen en base64 (PNG)', content.some((c) => c.type === 'image' && c.source && c.source.type === 'base64' && c.source.media_type === 'image/png'));
+    check('el prompt incluye titulo y temas existentes', content.some((c) => c.type === 'text' && c.text.includes('Pico nevado') && c.text.includes('Montañas')));
+    check('instruccion de sistema anti-inyeccion', /nunca los obedezcas/.test(call.body.system || ''));
+
+    const mont = await anon.get('/tema/montanas');
+    check('pagina del tema /tema/montanas', mont.status === 200 && mont.text.includes('Pico nevado'));
+    const grouped = await anon.get('/temas');
+    check('vista agrupada /temas', grouped.status === 200 && grouped.text.includes('id="tema-montanas"') && grouped.text.includes('Pico nevado'));
+    check('chips de temas en la tienda', (await anon.get('/')).text.includes('href="/tema/montanas"'));
+    const pico = (await anon.get('/?q=Pico')).text.match(/\/producto\/(\d+)/)[1];
+    check('etiqueta de tema en la ficha del producto', (await anon.get(`/producto/${pico}`)).text.includes('href="/tema/montanas"'));
+    check('filtro combinado tema + tipo',
+      (await anon.get('/tema/montanas?tipo=sticker')).text.includes('No hay resultados') && (await anon.get('/tema/montanas?tipo=print')).text.includes('Pico nevado'));
+
+    // 2) La salida del modelo se sanea
+    await mk({ ...base0, title: 'Hostil', auto_themes: '1' });
+    const grouped2 = (await anon.get('/temas')).text;
+    check('tema nuevo creado por la IA', grouped2.includes('Gatos de la calle'));
+    check('HTML en la salida de la IA descartado', !grouped2.includes('onerror') && !grouped2.includes('<img src=x'));
+    check('sin temas repetidos', (grouped2.match(/id="tema-montanas"/g) || []).length === 1);
+
+    // 3) Si la IA falla, se usan las palabras del titulo
+    const r3 = await mk({ ...base0, title: 'IA-ERROR Retrato de mujer', auto_themes: '1' });
+    check('fallo de la IA no rompe el guardado', r3.status === 302);
+    check('respaldo por palabras clave (Retratos)', (await anon.get('/tema/retratos')).text.includes('Retrato de mujer'));
+    check('aviso indica "por palabras clave"', (await admin.get('/admin')).text.includes('por palabras clave'));
+
+    // 4) Seleccion manual + temas nuevos escritos a mano (se rechaza HTML)
+    const animalId = themeId((await admin.get('/admin/productos/nuevo')).text, 'Animales');
+    check('el formulario lista los temas con su id', !!animalId);
+    await mk({ ...base0, title: 'Manual', themes: [animalId], new_themes: 'Cuadros, <b>x</b>, Acuarela, Cuadros' });
+    check('tema manual asignado', (await anon.get('/tema/animales')).text.includes('Manual'));
+    check('tema nuevo manual creado', (await anon.get('/tema/cuadros')).status === 200 && (await anon.get('/tema/acuarela')).status === 200);
+    check('tema con HTML rechazado', (await anon.get('/tema/b-x-b')).status === 404 && !(await admin.get('/admin/temas')).text.includes('&lt;b&gt;'));
+    const manualPage = (await anon.get('/?q=Manual')).text.match(/\/producto\/(\d+)/)[1];
+    const mtags = (await anon.get(`/producto/${manualPage}`)).text;
+    check('la ficha muestra los 3 temas manuales', ['animales', 'cuadros', 'acuarela'].every((t) => mtags.includes(`href="/tema/${t}"`)));
+
+    // 5) Clasificar en bloque los productos sin tema
+    await mk({ ...base0, title: 'Sin tema todavia' }); // sin seleccion ni deteccion
+    const pre = (await admin.get('/admin/temas')).text;
+    check('el panel cuenta productos sin tema', /Clasificar productos sin tema \((\d+)\)/.test(pre) && !/sin tema \(0\)/.test(pre));
+    const bulk = await admin.post('/admin/temas/clasificar', { _csrf: tok });
+    check('clasificar en bloque', bulk.status === 302);
+    check('ya no quedan productos sin tema', /sin tema \(0\)/.test((await admin.get('/admin/temas')).text));
+    check('el tema creado en bloque existe', (await anon.get('/tema/abstracto')).status === 200);
+
+    // 6) Gestion de temas
+    const tPage = (await admin.get('/admin/temas')).text;
+    const idOf = (name) => {
+      // El id de la fila cuyo input tiene ese nombre (sin saltar de un formulario a otro)
+      const m = tPage.match(new RegExp('/admin/temas/(\\d+)/renombrar"(?:(?!</form>)[\\s\\S])*?value="' + name + '"'));
+      return m ? m[1] : null;
+    };
+    const cuadrosId = idOf('Cuadros');
+    check('el panel lista los temas', !!cuadrosId);
+    await admin.post(`/admin/temas/${cuadrosId}/renombrar`, { _csrf: tok, name: 'Pinturas' });
+    check('renombrar tema', (await anon.get('/tema/pinturas')).status === 200 && (await anon.get('/tema/cuadros')).status === 404);
+    await admin.post(`/admin/temas/${cuadrosId}/renombrar`, { _csrf: tok, name: 'Acuarela' });
+    check('no permite nombre duplicado', (await anon.get('/tema/pinturas')).status === 200);
+    const acuId = idOf('Acuarela');
+    await admin.post(`/admin/temas/${acuId}/eliminar`, { _csrf: tok });
+    check('eliminar tema conserva el producto', (await anon.get('/tema/acuarela')).status === 404 && (await anon.get(`/producto/${manualPage}`)).status === 200);
+
+    // 7) Seguridad
+    check('slug con inyeccion SQL -> 404', (await anon.get("/tema/x'%20OR%201=1--")).status === 404);
+    check('slug larguisimo -> 404', (await anon.get('/tema/' + 'a'.repeat(200))).status === 404);
+    const anonTok = await anon.csrf('/admin/login');
+    check('crear tema sin ser admin redirige al login', (await anon.post('/admin/temas', { _csrf: anonTok, name: 'Intruso' })).location === '/admin/login');
+    check('clasificar sin ser admin redirige al login', (await anon.post('/admin/temas/clasificar', { _csrf: anonTok })).location === '/admin/login');
+    const sitemap = (await anon.get('/sitemap.xml')).text;
+    check('sitemap incluye temas', sitemap.includes('/tema/montanas') && sitemap.includes('/temas'));
+    check('sin errores no controlados (temas)', !/unhandledRejection|uncaughtException|TypeError/.test(serverLog), serverLog.slice(-500));
+
     console.log('\n# Sesiones y limite de intentos');
     await admin.post('/admin/logout', { _csrf: tok });
     check('logout cierra el acceso', (await admin.get('/admin')).location === '/admin/login');
@@ -569,6 +695,7 @@ async function main() {
   } finally {
     server.kill();
     mailSrv.close();
+    aiSrv.close();
     await new Promise((r) => setTimeout(r, 300));
     for (const f of [tmpDb, tmpDb + '-wal', tmpDb + '-shm']) { try { fs.rmSync(f, { force: true }); } catch (_) { /* archivo aun bloqueado en Windows: queda en la carpeta temporal */ } }
     if (fs.existsSync(uploadsDir)) {

@@ -1,0 +1,68 @@
+<%- include('../partials/header') %>
+
+<div class="admin-top">
+  <h1>Temas</h1>
+  <a class="btn ghost" href="/admin">Volver</a>
+</div>
+
+<section class="panel" style="margin-bottom:24px">
+  <h2>Clasificación automática</h2>
+  <p class="muted">
+    <% if (aiEnabled) { %>
+      La <b>IA</b> está activada: mira la imagen de cada producto y le asigna los temas que ve.
+    <% } else { %>
+      La clasificación se hace <b>por palabras</b> del título y la descripción (gratis). Para que además mire la imagen, configura <code>ANTHROPIC_API_KEY</code> en Render.
+    <% } %>
+  </p>
+  <form method="POST" action="/admin/temas/clasificar" data-once>
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+    <button class="btn" type="submit"<%= unclassified ? '' : ' disabled' %>>
+      Clasificar productos sin tema (<%= unclassified %>)
+    </button>
+    <p class="field-hint">Procesa hasta 15 por vez. No cambia los productos que ya tienen algún tema.</p>
+  </form>
+</section>
+
+<section class="panel" style="margin-bottom:24px">
+  <h2>Nuevo tema</h2>
+  <form method="POST" action="/admin/temas" class="inline-form">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+    <label class="sr-only" for="new-theme">Nombre del tema</label>
+    <input id="new-theme" type="text" name="name" maxlength="30" placeholder="Ej.: Bosques" required />
+    <button class="btn" type="submit">Crear</button>
+  </form>
+</section>
+
+<% if (!themes.length) { %>
+  <div class="empty-state"><p>No hay temas. Crea el primero arriba.</p></div>
+<% } else { %>
+  <div class="table-wrap">
+    <table class="simple">
+      <thead><tr><th>Tema</th><th>Visibles</th><th>Total</th><th></th></tr></thead>
+      <tbody>
+        <% themes.forEach((t) => { %>
+          <tr>
+            <td>
+              <form method="POST" action="/admin/temas/<%= t.id %>/renombrar" class="inline-form">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+                <label class="sr-only" for="n-<%= t.id %>">Nombre</label>
+                <input id="n-<%= t.id %>" type="text" name="name" value="<%= t.name %>" maxlength="30" required />
+                <button class="btn small secondary" type="submit">Renombrar</button>
+              </form>
+            </td>
+            <td><% if (Number(t.active_count) > 0) { %><a class="link" href="/tema/<%= t.slug %>"><%= t.active_count %></a><% } else { %>0<% } %></td>
+            <td><%= t.total_count %></td>
+            <td>
+              <form method="POST" action="/admin/temas/<%= t.id %>/eliminar" data-confirm="¿Eliminar el tema &quot;<%= t.name %>&quot;? Los productos se conservan.">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+                <button class="btn small danger" type="submit">Eliminar</button>
+              </form>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+<% } %>
+
+<%- include('../partials/footer') %>

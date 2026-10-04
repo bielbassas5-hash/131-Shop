@@ -71,6 +71,24 @@
     <input id="extra" type="file" name="extra" multiple accept="image/png,image/jpeg,image/webp,image/gif" />
     <p class="field-hint">Detalles, escala, reverso... Se muestran como galería en la ficha del producto.</p>
   </div>
+  <fieldset class="field method-box themes-box">
+    <legend>Temas</legend>
+    <% if (allThemes.length) { %>
+      <div class="theme-checks">
+        <% allThemes.forEach((t) => { %>
+          <label class="check"><input type="checkbox" name="themes" value="<%= t.id %>"<%= selectedThemeIds.includes(Number(t.id)) ? ' checked' : '' %> /><span><%= t.name %></span></label>
+        <% }) %>
+      </div>
+    <% } %>
+    <div>
+      <label for="new_themes">Otros temas (separados por comas)</label>
+      <input id="new_themes" type="text" name="new_themes" value="<%= f.newThemes || '' %>" maxlength="200" placeholder="Acuarela, Cuadros" />
+    </div>
+    <label class="check" for="auto_themes">
+      <input id="auto_themes" type="checkbox" name="auto_themes" value="1"<%= (f.autoThemes !== undefined ? f.autoThemes : !product) ? ' checked' : '' %> />
+      <span>Si no elijo ninguno, detectar el tema automáticamente <%= aiEnabled ? '(con IA, a partir de la imagen)' : '(por palabras del título y la descripción)' %></span>
+    </label>
+  </fieldset>
   <% if (product) { %>
     <div class="field">
       <label class="check" for="active"><input id="active" type="checkbox" name="active" value="1"<%= f.active ? ' checked' : '' %> /><span>Visible en la tienda</span></label>
@@ -78,5 +96,14 @@
   <% } %>
   <button class="btn block" type="submit"><%= product ? 'Guardar cambios' : 'Publicar producto' %></button>
 </form>
+
+<% if (product) { %>
+  <form class="panel form-card" style="margin-top:20px" method="POST" action="/admin/productos/<%= product.id %>/detectar-temas">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+    <h3>Detectar temas ahora</h3>
+    <p class="field-hint">Analiza <%= aiEnabled ? 'la imagen con IA' : 'el título y la descripción' %> y <b>añade</b> los temas que encuentre, sin quitar los que ya tiene.</p>
+    <button class="btn secondary" type="submit">Detectar y añadir temas</button>
+  </form>
+<% } %>
 
 <%- include('../partials/footer') %>

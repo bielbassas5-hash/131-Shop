@@ -1,0 +1,31 @@
+<%- include('partials/header') %>
+
+<div class="page-head">
+  <h1>Temas</h1>
+  <p class="muted">Todo el catálogo agrupado por lo que representa cada pieza.</p>
+</div>
+
+<% if (!groups.length) { %>
+  <div class="empty-state">
+    <p>Todavía no hay productos clasificados por tema.</p>
+    <a class="btn secondary" href="/">Ver toda la tienda</a>
+  </div>
+<% } else { %>
+  <nav class="chips themes" aria-label="Ir a un tema">
+    <% groups.forEach((g) => { %><a class="chip" href="#tema-<%= g.slug %>"><%= g.name %> <span class="count"><%= g.total %></span></a><% }) %>
+  </nav>
+
+  <% groups.forEach((g) => { %>
+    <section class="theme-section" id="tema-<%= g.slug %>" aria-labelledby="h-<%= g.slug %>">
+      <div class="section-title">
+        <h2 id="h-<%= g.slug %>"><%= g.name %></h2>
+        <a class="link" href="/tema/<%= g.slug %>"><%= g.total > g.products.length ? 'Ver los ' + g.total : 'Ver página del tema' %> &rarr;</a>
+      </div>
+      <div class="grid">
+        <% g.products.forEach((p) => { %><%- include('partials/product-card', { p }) %><% }) %>
+      </div>
+    </section>
+  <% }) %>
+<% } %>
+
+<%- include('partials/footer') %>

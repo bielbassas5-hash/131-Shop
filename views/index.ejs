@@ -3,16 +3,16 @@
   const link = (o) => {
     const merged = Object.assign({}, filters, o);
     const params = new URLSearchParams();
-    Object.keys(merged).forEach((k) => { if (merged[k] && !(k === 'orden' && merged[k] === 'nuevo')) params.set(k, merged[k]); });
+    ['tipo', 'orden', 'q'].forEach((k) => { if (merged[k] && !(k === 'orden' && merged[k] === 'nuevo')) params.set(k, merged[k]); });
     const s = params.toString();
-    return '/' + (s ? '?' + s : '');
+    return (merged.tema ? '/tema/' + merged.tema : '/') + (s ? '?' + s : '');
   };
-  const filtered = filters.tipo || filters.q;
+  const filtered = filters.tipo || filters.q || filters.tema;
 %>
 
 <section aria-labelledby="catalogo-titulo">
   <div class="page-head">
-    <h1 id="catalogo-titulo"><%= filters.tipo ? TYPE_PLURALS[filters.tipo] : 'Tienda' %></h1>
+    <h1 id="catalogo-titulo"><%= theme ? theme.name : (filters.tipo ? TYPE_PLURALS[filters.tipo] : 'Tienda') %></h1>
     <p class="muted">
       Envío <%= euro(shop.shippingCents) %><% if (shop.freeFrom) { %>, gratis desde <%= euro(shop.freeFrom) %><% } %><% if (shop.pickupEnabled) { %> · Recogida en mano disponible<% } %>
     </p>
@@ -25,7 +25,7 @@
         <a class="chip<%= filters.tipo === t ? ' active' : '' %>" href="<%= link({ tipo: t }) %>"><%= TYPE_PLURALS[t] %></a>
       <% }) %>
     </div>
-    <form class="filters" method="GET" action="/" role="search">
+    <form class="filters" method="GET" action="<%= filters.tema ? '/tema/' + filters.tema : '/' %>" role="search">
       <% if (filters.tipo) { %><input type="hidden" name="tipo" value="<%= filters.tipo %>" /><% } %>
       <label class="sr-only" for="q">Buscar</label>
       <input id="q" type="search" name="q" value="<%= filters.q %>" placeholder="Buscar" maxlength="40" style="width:190px" />
@@ -38,6 +38,17 @@
       <button class="btn secondary small" type="submit">Buscar</button>
     </form>
   </div>
+
+  <% if (themes.length) { %>
+    <nav class="chips themes" aria-label="Temas">
+      <span class="chips-label">Temas</span>
+      <a class="chip<%= !filters.tema ? ' active' : '' %>" href="<%= link({ tema: '' }) %>">Todos</a>
+      <% themes.forEach((t) => { %>
+        <a class="chip<%= filters.tema === t.slug ? ' active' : '' %>" href="<%= link({ tema: t.slug }) %>"><%= t.name %> <span class="count"><%= t.active_count %></span></a>
+      <% }) %>
+      <a class="chip ghost-link" href="/temas">Ver agrupados</a>
+    </nav>
+  <% } %>
 
   <% if (products.length === 0) { %>
     <div class="empty-state">

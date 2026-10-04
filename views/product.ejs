@@ -46,6 +46,11 @@
   <div class="product-info">
     <span class="tag"><%= TYPE_LABELS[product.type] || product.type %></span>
     <h1><%= product.title %></h1>
+    <% if (productThemes.length) { %>
+      <ul class="tag-list" aria-label="Temas">
+        <% productThemes.forEach((t) => { %><li><a href="/tema/<%= t.slug %>"><%= t.name %></a></li><% }) %>
+      </ul>
+    <% } %>
     <span class="price"><%= euro(product.price_cents) %></span>
     <% if (product.description) { %><p class="desc"><%= product.description %></p><% } %>
 

@@ -1,6 +1,7 @@
 const express = require('express');
 const multer = require('multer');
 const db = require('../db');
+const { slugOf } = db;
 const { requireAdmin, adminHeaders } = require('../middleware/auth');
 const { deleteImage, UserError } = require('../lib/imageStorage');
 const { MAX_EXTRAS, extrasOf, validateFiles, saveMany, addExtras, removeExtras, removeAllExtras } = require('../lib/productImages');
@@ -10,6 +11,8 @@ const { STATUSES, setStatus, paymentInfo, StockError } = require('../lib/orders'
 const { stripeConfigured } = require('../lib/payments');
 const { STATUS_LABELS } = require('../lib/format');
 const notify = require('../lib/notify');
+const themesLib = require('../lib/themes');
+const classify = require('../lib/classify');
 const { configured: mailConfigured } = require('../lib/mailer');
 
 const router = express.Router();
@@ -126,8 +129,38 @@ router.get(
 );
 
 // ---------- Productos ----------
+// ---- Temas en el formulario de producto ----
+const toIds = (v) =>
+  []
+    .concat(v || [])
+    .map(String)
+    .filter((x) => /^\d{1,9}$/.test(x))
+    .map(Number)
+    .slice(0, 20);
+
+// Lo que el administrador marco/escribio (para no perderlo si hay que repetir el formulario)
+const themeForm = (body) => ({
+  themeIds: toIds(body.themes),
+  newThemes: typeof body.new_themes === 'string' ? body.new_themes.slice(0, 200) : '',
+  autoThemes: body.auto_themes === '1',
+});
+
+// Guarda la seleccion manual y, si no hay ninguna y esta marcado, detecta los temas solos.
+async function applyThemes(product, body, { buffer } = {}) {
+  const created = await themesLib.ensureThemes(themesLib.parseNames(body.new_themes));
+  const ids = [...new Set([...toIds(body.themes), ...created])];
+  await themesLib.setProductThemes(product.id, ids);
+  if (!ids.length && body.auto_themes === '1') return classify.classifyProduct(product, { buffer });
+  return null;
+}
+
+const describeDetection = (d) =>
+  d && d.names.length ? ` Temas detectados ${d.source === 'ai' ? 'con IA' : 'por palabras clave'}: ${d.names.join(', ')}.` : '';
+
 async function renderForm(res, { product = null, form = null, errors = {}, error = null, status = 200 }) {
   const extras = product ? await extrasOf(product.id) : [];
+  const allThemes = await themesLib.allThemes();
+  const selectedThemeIds = form && form.themeIds ? form.themeIds : product ? (await themesLib.themesOf(product.id)).map((t) => Number(t.id)) : [];
   res.status(status).render('admin/product-form', {
     product,
     form,
@@ -135,6 +168,9 @@ async function renderForm(res, { product = null, form = null, errors = {}, error
     error,
     extras,
     maxExtras: MAX_EXTRAS,
+    allThemes,
+    selectedThemeIds,
+    aiEnabled: classify.aiEnabled(),
     meta: { title: product ? 'Editar producto' : 'Nuevo producto', noindex: true },
   });
 }
@@ -151,7 +187,7 @@ router.post(
     let error = req.uploadError || null;
     if (!cover && !error) error = 'Sube una imagen del producto.';
     if (!error && extras.length > MAX_EXTRAS) error = `Máximo ${MAX_EXTRAS} imágenes adicionales.`;
-    if (!v.ok || error) return renderForm(res, { form: v.values, errors: v.errors, error, status: 400 });
+    if (!v.ok || error) return renderForm(res, { form: { ...v.values, ...themeForm(req.body) }, errors: v.errors, error, status: 400 });
 
     let coverPath;
     let extraPaths;
@@ -160,7 +196,7 @@ router.post(
       [coverPath, ...extraPaths] = await saveMany([cover, ...extras]);
     } catch (err) {
       if (!(err instanceof UserError)) throw err;
-      return renderForm(res, { form: v.values, errors: v.errors, error: err.message, status: 400 });
+      return renderForm(res, { form: { ...v.values, ...themeForm(req.body) }, errors: v.errors, error: err.message, status: 400 });
     }
 
     const created = await db.run(
@@ -169,7 +205,12 @@ router.post(
       [v.values.title, v.values.description, v.price_cents, coverPath, v.values.type, v.stock]
     );
     await addExtras(created.lastInsertRowid, extraPaths);
-    req.session.flash = { type: 'success', msg: `"${v.values.title}" publicado.` };
+    const detection = await applyThemes(
+      { id: created.lastInsertRowid, title: v.values.title, description: v.values.description, image_path: coverPath },
+      req.body,
+      { buffer: cover.buffer }
+    );
+    req.session.flash = { type: 'success', msg: `"${v.values.title}" publicado.${describeDetection(detection)}` };
     res.redirect('/admin');
   })
 );
@@ -199,7 +240,7 @@ router.post(
 
     const v = validateProduct(req.body);
     const active = req.body.active === '1';
-    const form = { ...v.values, active };
+    const form = { ...v.values, active, ...themeForm(req.body) };
     const { cover, extras } = pickFiles(req);
 
     // ids de extras a quitar (puede llegar un valor suelto o una lista)
@@ -237,7 +278,12 @@ router.post(
     if (coverPath) await deleteImage(product.image_path);
     await removeExtras(product.id, removeIds);
     await addExtras(product.id, extraPaths);
-    req.session.flash = { type: 'success', msg: 'Cambios guardados.' };
+    const detection = await applyThemes(
+      { id: product.id, title: v.values.title, description: v.values.description, image_path },
+      req.body,
+      { buffer: cover ? cover.buffer : undefined }
+    );
+    req.session.flash = { type: 'success', msg: `Cambios guardados.${describeDetection(detection)}` };
     res.redirect('/admin');
   })
 );
@@ -254,6 +300,103 @@ router.post(
       req.session.flash = { type: 'success', msg: `"${product.title}" eliminado.` };
     }
     res.redirect('/admin');
+  })
+);
+
+// ---------- Temas ----------
+router.post(
+  '/admin/productos/:id/detectar-temas',
+  requireAdmin,
+  wrap(async (req, res) => {
+    const product = await findProduct(req);
+    if (!product) return res.status(404).render('error', { status: 404 });
+    const detection = await classify.classifyProduct(product);
+    req.session.flash = detection.names.length
+      ? { type: 'success', msg: `Temas detectados ${detection.source === 'ai' ? 'con IA' : 'por palabras clave'}: ${detection.names.join(', ')}.` }
+      : { type: 'info', msg: 'No se ha podido identificar ningún tema. Márcalos a mano.' };
+    res.redirect(`/admin/productos/${product.id}/editar`);
+  })
+);
+
+router.get(
+  '/admin/temas',
+  requireAdmin,
+  wrap(async (req, res) => {
+    const withoutThemes = await themesLib.productsWithoutThemes(1000);
+    res.render('admin/themes', {
+      themes: await themesLib.allThemes(),
+      unclassified: withoutThemes.length,
+      aiEnabled: classify.aiEnabled(),
+      meta: { title: 'Temas', noindex: true },
+    });
+  })
+);
+
+router.post(
+  '/admin/temas',
+  requireAdmin,
+  wrap(async (req, res) => {
+    const names = themesLib.parseNames(req.body.name);
+    if (!names.length) {
+      req.session.flash = { type: 'error', msg: 'Nombre no válido (2-30 letras, números, espacios o guiones).' };
+    } else {
+      await themesLib.ensureThemes(names);
+      req.session.flash = { type: 'success', msg: `Tema "${names[0]}" creado.` };
+    }
+    res.redirect('/admin/temas');
+  })
+);
+
+// Clasifica (como máximo 15 por vez) los productos que aún no tienen ningún tema
+router.post(
+  '/admin/temas/clasificar',
+  requireAdmin,
+  wrap(async (req, res) => {
+    const pending = await themesLib.productsWithoutThemes(15);
+    let done = 0;
+    for (const p of pending) {
+      const d = await classify.classifyProduct(p);
+      if (d.names.length) done += 1;
+    }
+    const left = (await themesLib.productsWithoutThemes(1000)).length;
+    req.session.flash = {
+      type: pending.length ? 'success' : 'info',
+      msg: pending.length
+        ? `Clasificados ${done} de ${pending.length} productos.${left ? ` Quedan ${left} sin tema; vuelve a pulsar el botón.` : ''}`
+        : 'Todos los productos ya tienen algún tema.',
+    };
+    res.redirect('/admin/temas');
+  })
+);
+
+router.post(
+  '/admin/temas/:id/renombrar',
+  requireAdmin,
+  wrap(async (req, res) => {
+    const id = /^\d+$/.test(req.params.id) ? Number(req.params.id) : null;
+    const name = themesLib.cleanName(req.body.name);
+    const slug = name ? slugOf(name) : '';
+    const clash = slug ? await db.get('SELECT id FROM themes WHERE slug = ? AND id != ?', [slug, id]) : null;
+    if (!id || !name || !slug) req.session.flash = { type: 'error', msg: 'Nombre no válido.' };
+    else if (clash) req.session.flash = { type: 'error', msg: 'Ya existe un tema con ese nombre.' };
+    else {
+      await db.run('UPDATE themes SET name = ?, slug = ? WHERE id = ?', [name, slug, id]);
+      req.session.flash = { type: 'success', msg: 'Tema renombrado.' };
+    }
+    res.redirect('/admin/temas');
+  })
+);
+
+router.post(
+  '/admin/temas/:id/eliminar',
+  requireAdmin,
+  wrap(async (req, res) => {
+    if (/^\d+$/.test(req.params.id)) {
+      await db.run('DELETE FROM product_themes WHERE theme_id = ?', [req.params.id]);
+      await db.run('DELETE FROM themes WHERE id = ?', [req.params.id]);
+      req.session.flash = { type: 'success', msg: 'Tema eliminado (los productos se conservan).' };
+    }
+    res.redirect('/admin/temas');
   })
 );
 

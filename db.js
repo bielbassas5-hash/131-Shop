@@ -99,6 +99,24 @@ async function migrate() {
       position INTEGER NOT NULL DEFAULT 0
     );
 
+    CREATE TABLE IF NOT EXISTS themes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      slug TEXT NOT NULL UNIQUE,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS product_themes (
+      product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+      theme_id INTEGER NOT NULL REFERENCES themes(id) ON DELETE CASCADE,
+      PRIMARY KEY (product_id, theme_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT
+    );
+
     CREATE TABLE IF NOT EXISTS sessions (
       sid TEXT PRIMARY KEY,
       data TEXT NOT NULL,
@@ -122,7 +140,31 @@ async function migrate() {
     CREATE INDEX IF NOT EXISTS idx_product_images_product ON product_images(product_id, position);
     CREATE INDEX IF NOT EXISTS idx_products_active ON products(active, created_at);
     CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires);
+    CREATE INDEX IF NOT EXISTS idx_product_themes_theme ON product_themes(theme_id);
   `);
 }
 
-module.exports = { ...base, migrate, transaction };
+// Temas basicos: se siembran una sola vez (si luego los borras, no vuelven a aparecer).
+const DEFAULT_THEMES = [
+  'Montañas', 'Retratos', 'Animales', 'Paisajes', 'Flores y plantas', 'Ciudad',
+  'Mar', 'Espacio', 'Fantasía', 'Personajes', 'Comida', 'Letras',
+];
+const slugOf = (name) =>
+  String(name)
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40);
+
+async function seedThemes() {
+  const done = await base.get("SELECT value FROM settings WHERE key = 'themes_seeded'");
+  if (done) return;
+  for (const name of DEFAULT_THEMES) {
+    await base.run('INSERT OR IGNORE INTO themes (name, slug) VALUES (?, ?)', [name, slugOf(name)]);
+  }
+  await base.run("INSERT OR REPLACE INTO settings (key, value) VALUES ('themes_seeded', '1')");
+}
+
+module.exports = { ...base, migrate: async () => { await migrate(); await seedThemes(); }, transaction, slugOf, DEFAULT_THEMES };
