@@ -369,3 +369,15 @@ fieldset.method-box legend { padding: 0 8px; font-size: .85rem; color: var(--mut
 .thumb-remove .check { font-size: .78rem; align-items: center; }
 .thumb-remove .check input { width: 15px; height: 15px; margin: 0; }
 @media (max-width: 900px) { .product-media { position: static; } }
+
+/* ---------- Checklist del panel ---------- */
+.checklist { margin-bottom: 28px; }
+.checklist h2 { margin-bottom: 4px; }
+.checklist ul { list-style: none; padding: 0; margin: 14px 0 0; display: grid; gap: 8px; }
+.checklist li { display: flex; gap: 12px; align-items: baseline; font-size: .94rem; }
+.checklist li > span:first-child { font-weight: 700; width: 1.2em; text-align: center; }
+.checklist li.ok { color: var(--muted); }
+.checklist li.ok > span:first-child { color: var(--ok); }
+.checklist li.todo-item > span:first-child { color: var(--danger); }
+.checklist li.opt > span:first-child { color: var(--muted); }
+.checklist code { background: var(--bg-soft); border: 1px solid var(--border); padding: 1px 7px; border-radius: 6px; font-size: .78rem; color: var(--gold); margin-left: 6px; }

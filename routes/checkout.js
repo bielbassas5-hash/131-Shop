@@ -1,7 +1,7 @@
 const express = require('express');
 const db = require('../db');
 const { wrap, createLimiter } = require('../lib/security');
-const { loadCart, createOrder, setStatus, StockError } = require('../lib/orders');
+const { loadCart, createOrder, setStatus, paymentInfo, StockError } = require('../lib/orders');
 const { validateCheckout, allowedCountries, COUNTRY_NAMES } = require('../lib/validate');
 
 const router = express.Router();
@@ -133,8 +133,8 @@ router.get(
       items,
       shipTo,
       stripeConfigured,
-      bankIban: process.env.BANK_IBAN || '',
-      bizumPhone: process.env.BIZUM_PHONE || '',
+      bankIban: paymentInfo().iban,
+      bizumPhone: paymentInfo().bizum,
       meta: { title: `Pedido #${order.id}`, noindex: true },
     });
   })

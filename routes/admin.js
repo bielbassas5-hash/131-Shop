@@ -6,7 +6,8 @@ const { deleteImage, UserError } = require('../lib/imageStorage');
 const { MAX_EXTRAS, extrasOf, validateFiles, saveMany, addExtras, removeExtras, removeAllExtras } = require('../lib/productImages');
 const { wrap, createLimiter, safeEqual } = require('../lib/security');
 const { validateProduct, text } = require('../lib/validate');
-const { STATUSES, setStatus, StockError } = require('../lib/orders');
+const { STATUSES, setStatus, paymentInfo, StockError } = require('../lib/orders');
+const { stripeConfigured } = require('../lib/payments');
 const { STATUS_LABELS } = require('../lib/format');
 const notify = require('../lib/notify');
 const { configured: mailConfigured } = require('../lib/mailer');
@@ -47,6 +48,20 @@ const isWeak = () => {
   const pw = process.env.ADMIN_PASSWORD || '';
   return pw.length < 10 || WEAK_PASSWORDS.includes(pw.toLowerCase());
 };
+
+// Lista de puesta en marcha: lo que falta configurar antes de vender de verdad.
+function launchChecklist() {
+  const e = process.env;
+  const pay = paymentInfo();
+  return [
+    { ok: !isWeak(), label: 'Contraseña de administrador segura', hint: 'ADMIN_PASSWORD (12 caracteres o más)' },
+    { ok: stripeConfigured || !!pay.bizum || !!pay.iban, label: 'Forma de cobro configurada (Bizum, IBAN real o Stripe)', hint: 'BIZUM_PHONE / BANK_IBAN' },
+    { ok: !!e.CONTACT_EMAIL, label: 'Email de contacto visible en la web', hint: 'CONTACT_EMAIL' },
+    { ok: !!(e.LEGAL_NAME && e.LEGAL_NIF && e.LEGAL_ADDRESS), label: 'Datos del titular en las páginas legales', hint: 'LEGAL_NAME, LEGAL_NIF, LEGAL_ADDRESS' },
+    { ok: !!e.SITE_URL, label: 'Dirección pública de la web (para enlaces y SEO)', hint: 'SITE_URL' },
+    { ok: mailConfigured() && !!e.OWNER_EMAIL, label: 'Avisos por email de pedidos nuevos (opcional)', hint: 'BREVO_API_KEY, MAIL_FROM, OWNER_EMAIL', optional: true },
+  ];
+}
 
 // ---------- Acceso ----------
 router.get('/admin/login', (req, res) => {
@@ -100,7 +115,13 @@ router.get(
       soldOut: products.filter((p) => p.active && p.stock <= 0).length,
       lowStock: products.filter((p) => p.active && p.stock > 0 && p.stock <= 2).length,
     };
-    res.render('admin/dashboard', { products, stats, weakPassword: isWeak(), meta: { title: 'Panel', noindex: true } });
+    res.render('admin/dashboard', {
+      products,
+      stats,
+      weakPassword: isWeak(),
+      checklist: launchChecklist(),
+      meta: { title: 'Panel', noindex: true },
+    });
   })
 );
 

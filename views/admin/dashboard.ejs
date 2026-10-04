@@ -16,6 +16,22 @@
   <div class="flash warn" role="alert"><div class="flash-body"><b>Cambia la contraseña de administrador.</b> La actual es corta o muy común. En Render: Environment &rarr; <code>ADMIN_PASSWORD</code> (usa 12 caracteres o más).</div></div>
 <% } %>
 
+<% const pending = checklist.filter((c) => !c.ok); %>
+<% if (pending.length) { %>
+  <section class="panel checklist" aria-label="Puesta en marcha">
+    <h2>Puesta en marcha</h2>
+    <p class="muted">Configura estas variables en Render (Environment) antes de vender de verdad.</p>
+    <ul>
+      <% checklist.forEach((c) => { %>
+        <li class="<%= c.ok ? 'ok' : (c.optional ? 'opt' : 'todo-item') %>">
+          <span aria-hidden="true"><%= c.ok ? '✓' : (c.optional ? '○' : '✗') %></span>
+          <span><%= c.label %> <% if (!c.ok) { %><code><%= c.hint %></code><% } %></span>
+        </li>
+      <% }) %>
+    </ul>
+  </section>
+<% } %>
+
 <div class="stats">
   <div class="stat"><b><%= euro(stats.revenue) %></b><span>Ingresos confirmados</span></div>
   <div class="stat<%= stats.pending ? ' alert' : '' %>"><b><%= stats.pending %></b><span>Pedidos pendientes de pago</span></div>

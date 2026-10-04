@@ -226,6 +226,76 @@ async function suiteStripe() {
   }
 }
 
+// Arranque contra una base de datos con el esquema ANTIGUO (el que ya hay en produccion)
+// y en modo produccion detras de un proxy (Render): cookies Secure, HSTS, migracion.
+async function suiteProdAndMigration() {
+  console.log('\n# Modo produccion y migracion desde el esquema antiguo');
+  const { createClient } = require('@libsql/client');
+  const port = 3058;
+  const base = `http://127.0.0.1:${port}`;
+  const dbFile = path.join(os.tmpdir(), `tienda131-test3-${Date.now()}.db`);
+  const dbUrl = 'file:' + dbFile.replace(/\\/g, '/');
+
+  // Esquema de la primera version desplegada (sin token, envio ni sesiones)
+  const old = createClient({ url: dbUrl });
+  await old.executeMultiple(`
+    CREATE TABLE products (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, description TEXT, price_cents INTEGER NOT NULL, image_path TEXT, type TEXT NOT NULL DEFAULT 'sticker', stock INTEGER NOT NULL DEFAULT 1, active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL DEFAULT (datetime('now')));
+    CREATE TABLE orders (id INTEGER PRIMARY KEY AUTOINCREMENT, stripe_session_id TEXT UNIQUE, customer_email TEXT, customer_name TEXT, shipping_address TEXT, total_cents INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'pending', created_at TEXT NOT NULL DEFAULT (datetime('now')));
+    CREATE TABLE order_items (id INTEGER PRIMARY KEY AUTOINCREMENT, order_id INTEGER NOT NULL REFERENCES orders(id), product_id INTEGER REFERENCES products(id) ON DELETE SET NULL, title TEXT NOT NULL, price_cents INTEGER NOT NULL, quantity INTEGER NOT NULL DEFAULT 1);
+    INSERT INTO products (title, price_cents, image_path, stock) VALUES ('Antiguo', 450, '/old.png', 3);
+    INSERT INTO orders (customer_email, customer_name, shipping_address, total_cents, status) VALUES ('old@example.com', 'Cliente Antiguo', '{"name":"Cliente Antiguo","address":"Calle 1","city":"Madrid","postal_code":"28001","country":"ES"}', 800, 'paid');
+    INSERT INTO order_items (order_id, product_id, title, price_cents, quantity) VALUES (1, 1, 'Antiguo', 450, 1);
+    INSERT INTO orders (customer_email, customer_name, shipping_address, total_cents, status) VALUES ('pend@example.com', 'Pendiente', '{"name":"Pendiente"}', 500, 'pending');
+    INSERT INTO order_items (order_id, product_id, title, price_cents, quantity) VALUES (2, 1, 'Antiguo', 450, 1);
+  `);
+  old.close();
+
+  const srv = spawn(process.execPath, ['server.js'], {
+    cwd: path.join(__dirname, '..'),
+    env: { ...baseEnv(), PORT: String(port), TURSO_DATABASE_URL: dbUrl, STRIPE_SECRET_KEY: '', RENDER: 'true', BANK_IBAN: 'ES00 0000 0000 0000 0000 0000', BIZUM_PHONE: '' },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  let log3 = '';
+  srv.stdout.on('data', (d) => (log3 += d));
+  srv.stderr.on('data', (d) => (log3 += d));
+  try {
+    await waitForServer(base);
+    const proxied = { 'x-forwarded-proto': 'https', 'x-forwarded-for': '203.0.113.7' };
+    const anon = new Client(base);
+    const home = await anon.get('/', { headers: proxied });
+    check('arranca con la base de datos antigua', home.status === 200 && home.text.includes('Antiguo'));
+    check('HSTS en produccion', /max-age=\d+/.test(home.headers.get('strict-transport-security') || ''));
+    check('CSP con upgrade-insecure-requests', /upgrade-insecure-requests/.test(home.headers.get('content-security-policy') || ''));
+    const setCookies = home.headers.getSetCookie().join('\n');
+    check('cookie csrf Secure + HttpOnly + SameSite', /csrf=[a-f0-9]+;.*HttpOnly/i.test(setCookies) && /Secure/i.test(setCookies) && /SameSite=Lax/i.test(setCookies), setCookies);
+
+    // Sesion de administrador: cookie sid Secure y Lax
+    const admin = new Client(base);
+    const t = (await admin.get('/admin/login', { headers: proxied })).text.match(/name="_csrf" value="([a-f0-9]+)"/)[1];
+    const login = await admin.req('POST', '/admin/login', { form: { _csrf: t, password: ADMIN_PASSWORD }, headers: proxied });
+    const sidCookie = login.headers.getSetCookie().find((c) => c.startsWith('sid=')) || '';
+    check('login en produccion', login.status === 302);
+    check('cookie de sesion Secure + HttpOnly + Lax', /Secure/i.test(sidCookie) && /HttpOnly/i.test(sidCookie) && /SameSite=Lax/i.test(sidCookie), sidCookie);
+
+    const detail = await admin.get('/admin/pedidos/1', { headers: proxied });
+    check('pedido antiguo migrado y visible en el admin', detail.status === 200 && detail.text.includes('Cliente Antiguo'));
+    const tokenMatch = detail.text.match(/\/pedido\/([a-f0-9]{32})/);
+    check('pedido antiguo recibe un token', !!tokenMatch);
+    if (tokenMatch) check('pedido antiguo accesible por su token', (await anon.get(`/pedido/${tokenMatch[1]}`, { headers: proxied })).status === 200);
+    const pendDetail = await admin.get('/admin/pedidos/2', { headers: proxied });
+    const pendToken = pendDetail.text.match(/\/pedido\/([a-f0-9]{32})/);
+    const pendPage = pendToken ? await anon.get(`/pedido/${pendToken[1]}`, { headers: proxied }) : { text: '' };
+    check('IBAN de ejemplo nunca se muestra al cliente', !!pendToken && !pendPage.text.includes('ES00') && /Escríbenos/.test(pendPage.text));
+    const dash = await admin.get('/admin', { headers: proxied });
+    check('panel muestra la lista de puesta en marcha', dash.text.includes('Puesta en marcha') && dash.text.includes('LEGAL_NAME'));
+    check('sin errores en el log (produccion)', !/\[error\]|unhandledRejection|uncaughtException/.test(log3), log3.slice(-500));
+  } finally {
+    srv.kill();
+    await sleep(300);
+    for (const f of [dbFile, dbFile + '-wal', dbFile + '-shm']) { try { fs.rmSync(f, { force: true }); } catch (_) { /* bloqueado en Windows */ } }
+  }
+}
+
 async function main() {
   const mailSrv = await startMailServer();
   const server = spawn(process.execPath, ['server.js'], {
@@ -240,7 +310,7 @@ async function main() {
       PICKUP_ENABLED: '1',
       PICKUP_NOTE: 'Zona centro',
       BIZUM_PHONE: '600111222',
-      BANK_IBAN: 'ES00 1111 2222 3333 4444 5555',
+      BANK_IBAN: 'ES91 2100 0418 4502 0005 1332',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -351,6 +421,7 @@ async function main() {
     check('pagina de pedido 200 y no-store', orderPage.status === 200 && /no-store/.test(orderPage.headers.get('cache-control') || ''));
     check('total del servidor ignora el cliente (12,50)', /12,50/.test(orderPage.text));
     check('instrucciones Bizum', orderPage.text.includes('600111222'));
+    check('IBAN real visible', orderPage.text.includes('ES91 2100 0418 4502 0005 1332'));
     await sleep(500);
     const custMail = mailTo('ana@example.com', /Hemos recibido tu pedido #1/);
     check('email de confirmacion al cliente', custMail.length === 1 && custMail[0].textContent.includes('600111222') && custMail[0].textContent.includes('https://tienda.test/pedido/'));
@@ -478,6 +549,7 @@ async function main() {
     check('sin errores no controlados en el log', !/\[error\]|unhandledRejection|uncaughtException/.test(serverLog), serverLog.slice(-600));
 
     await suiteStripe();
+    await suiteProdAndMigration();
   } finally {
     server.kill();
     mailSrv.close();
