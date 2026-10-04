@@ -6,7 +6,7 @@
     '@type': 'Product',
     name: product.title,
     description: product.description || product.title,
-    image: product.image_path ? (/^https?:/.test(product.image_path) ? product.image_path : shop.siteUrl + product.image_path) : undefined,
+    image: gallery.map((g) => (/^https?:/.test(g) ? g : shop.siteUrl + g)),
     brand: { '@type': 'Brand', name: artistName },
     offers: {
       '@type': 'Offer',
@@ -24,9 +24,22 @@
 </nav>
 
 <div class="product-detail">
-  <div class="product-gallery">
-    <% if (product.image_path) { %>
-      <img src="<%= thumb(product.image_path, 1100) %>" alt="<%= product.title %>" width="1100" height="1100" />
+  <div class="product-media">
+    <div class="product-gallery">
+      <% if (product.image_path) { %>
+        <img id="main-image" src="<%= thumb(product.image_path, 1100) %>" alt="<%= product.title %>" width="1100" height="1100" />
+      <% } %>
+    </div>
+    <% if (gallery.length > 1) { %>
+      <ul class="gallery-thumbs" aria-label="Más imágenes">
+        <% gallery.forEach((src, idx) => { %>
+          <li>
+            <a href="<%= thumb(src, 1100) %>" data-gallery-src="<%= thumb(src, 1100) %>" class="<%= idx === 0 ? 'active' : '' %>" aria-label="Ver imagen <%= idx + 1 %>">
+              <img src="<%= thumb(src, 160) %>" alt="" width="80" height="80" loading="lazy" />
+            </a>
+          </li>
+        <% }) %>
+      </ul>
     <% } %>
   </div>
 

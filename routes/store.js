@@ -2,6 +2,7 @@ const express = require('express');
 const db = require('../db');
 const { wrap } = require('../lib/security');
 const { TYPES, TYPE_LABELS, TYPE_PLURALS } = require('../lib/format');
+const { extrasOf } = require('../lib/productImages');
 
 const router = express.Router();
 
@@ -61,9 +62,13 @@ router.get(
       [product.id, product.type]
     );
 
+    const extras = await extrasOf(product.id);
+    const gallery = [product.image_path, ...extras.map((e) => e.image_path)].filter(Boolean);
+
     res.render('product', {
       product,
       related,
+      gallery,
       meta: {
         title: product.title,
         description: (product.description || '').replace(/\s+/g, ' ').slice(0, 155) ||

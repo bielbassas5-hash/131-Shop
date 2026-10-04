@@ -92,6 +92,13 @@ async function migrate() {
       quantity INTEGER NOT NULL DEFAULT 1
     );
 
+    CREATE TABLE IF NOT EXISTS product_images (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+      image_path TEXT NOT NULL,
+      position INTEGER NOT NULL DEFAULT 0
+    );
+
     CREATE TABLE IF NOT EXISTS sessions (
       sid TEXT PRIMARY KEY,
       data TEXT NOT NULL,
@@ -112,6 +119,7 @@ async function migrate() {
     CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_token ON orders(token);
     CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status, created_at);
     CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);
+    CREATE INDEX IF NOT EXISTS idx_product_images_product ON product_images(product_id, position);
     CREATE INDEX IF NOT EXISTS idx_products_active ON products(active, created_at);
     CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires);
   `);

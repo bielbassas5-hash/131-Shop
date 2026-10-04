@@ -2,7 +2,8 @@ const express = require('express');
 const multer = require('multer');
 const db = require('../db');
 const { requireAdmin, adminHeaders } = require('../middleware/auth');
-const { saveImage, deleteImage, UserError } = require('../lib/imageStorage');
+const { deleteImage, UserError } = require('../lib/imageStorage');
+const { MAX_EXTRAS, extrasOf, validateFiles, saveMany, addExtras, removeExtras, removeAllExtras } = require('../lib/productImages');
 const { wrap, createLimiter, safeEqual } = require('../lib/security');
 const { validateProduct, text } = require('../lib/validate');
 const { STATUSES, setStatus, StockError } = require('../lib/orders');
@@ -19,18 +20,27 @@ const WEAK_PASSWORDS = ['arte131', 'admin', 'password', '123456', '131', 'contra
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 8 * 1024 * 1024, files: 1 },
+  limits: { fileSize: 8 * 1024 * 1024, files: 1 + MAX_EXTRAS },
 });
+const imageFields = upload.fields([
+  { name: 'image', maxCount: 1 },
+  { name: 'extra', maxCount: MAX_EXTRAS + 1 },
+]);
 
 // Multer sin romper el flujo: el error se guarda en req.uploadError y la ruta lo muestra.
-function uploadImage(req, res, next) {
-  upload.single('image')(req, res, (err) => {
+function uploadImages(req, res, next) {
+  imageFields(req, res, (err) => {
     if (err) {
       req.uploadError =
-        err.code === 'LIMIT_FILE_SIZE' ? 'La imagen supera los 8 MB.' : 'No se ha podido leer la imagen.';
+        err.code === 'LIMIT_FILE_SIZE' ? 'Alguna imagen supera los 8 MB.' : 'No se han podido leer las imágenes.';
     }
     next();
   });
+}
+
+function pickFiles(req) {
+  const f = req.files || {};
+  return { cover: (f.image || [])[0], extras: f.extra || [] };
 }
 
 const isWeak = () => {
@@ -95,41 +105,49 @@ router.get(
 );
 
 // ---------- Productos ----------
-function renderForm(res, { product = null, form = null, errors = {}, error = null, status = 200 }) {
+async function renderForm(res, { product = null, form = null, errors = {}, error = null, status = 200 }) {
+  const extras = product ? await extrasOf(product.id) : [];
   res.status(status).render('admin/product-form', {
     product,
     form,
     errors,
     error,
+    extras,
+    maxExtras: MAX_EXTRAS,
     meta: { title: product ? 'Editar producto' : 'Nuevo producto', noindex: true },
   });
 }
 
-router.get('/admin/productos/nuevo', requireAdmin, (req, res) => renderForm(res, {}));
+router.get('/admin/productos/nuevo', requireAdmin, wrap((req, res) => renderForm(res, {})));
 
 router.post(
   '/admin/productos/nuevo',
   requireAdmin,
-  uploadImage,
+  uploadImages,
   wrap(async (req, res) => {
     const v = validateProduct(req.body);
+    const { cover, extras } = pickFiles(req);
     let error = req.uploadError || null;
-    if (!req.file && !error) error = 'Sube una imagen del producto.';
+    if (!cover && !error) error = 'Sube una imagen del producto.';
+    if (!error && extras.length > MAX_EXTRAS) error = `Máximo ${MAX_EXTRAS} imágenes adicionales.`;
     if (!v.ok || error) return renderForm(res, { form: v.values, errors: v.errors, error, status: 400 });
 
-    let image_path;
+    let coverPath;
+    let extraPaths;
     try {
-      image_path = await saveImage(req.file);
+      validateFiles([cover, ...extras]);
+      [coverPath, ...extraPaths] = await saveMany([cover, ...extras]);
     } catch (err) {
       if (!(err instanceof UserError)) throw err;
       return renderForm(res, { form: v.values, errors: v.errors, error: err.message, status: 400 });
     }
 
-    await db.run(
+    const created = await db.run(
       `INSERT INTO products (title, description, price_cents, image_path, type, stock, active)
        VALUES (?, ?, ?, ?, ?, ?, 1)`,
-      [v.values.title, v.values.description, v.price_cents, image_path, v.values.type, v.stock]
+      [v.values.title, v.values.description, v.price_cents, coverPath, v.values.type, v.stock]
     );
+    await addExtras(created.lastInsertRowid, extraPaths);
     req.session.flash = { type: 'success', msg: `"${v.values.title}" publicado.` };
     res.redirect('/admin');
   })
@@ -146,40 +164,58 @@ router.get(
   wrap(async (req, res) => {
     const product = await findProduct(req);
     if (!product) return res.status(404).render('error', { status: 404 });
-    renderForm(res, { product });
+    await renderForm(res, { product });
   })
 );
 
 router.post(
   '/admin/productos/:id/editar',
   requireAdmin,
-  uploadImage,
+  uploadImages,
   wrap(async (req, res) => {
     const product = await findProduct(req);
     if (!product) return res.status(404).render('error', { status: 404 });
 
     const v = validateProduct(req.body);
     const active = req.body.active === '1';
-    let error = req.uploadError || null;
-    if (!v.ok || error) {
-      return renderForm(res, { product, form: { ...v.values, active }, errors: v.errors, error, status: 400 });
-    }
+    const form = { ...v.values, active };
+    const { cover, extras } = pickFiles(req);
 
-    let image_path = product.image_path;
+    // ids de extras a quitar (puede llegar un valor suelto o una lista)
+    const removeIds = []
+      .concat(req.body.remove_extra || [])
+      .map((x) => String(x))
+      .filter((x) => /^\d{1,9}$/.test(x))
+      .map(Number);
+    const current = await extrasOf(product.id);
+    const kept = current.filter((e) => !removeIds.includes(Number(e.id))).length;
+
+    let error = req.uploadError || null;
+    if (!error && kept + extras.length > MAX_EXTRAS) error = `Máximo ${MAX_EXTRAS} imágenes adicionales (ahora tendrías ${kept + extras.length}).`;
+    if (!v.ok || error) return renderForm(res, { product, form, errors: v.errors, error, status: 400 });
+
+    let coverPath = null;
+    let extraPaths = [];
     try {
-      const uploaded = await saveImage(req.file);
-      if (uploaded) image_path = uploaded;
+      const incoming = [cover, ...extras].filter(Boolean);
+      validateFiles(incoming);
+      const saved = await saveMany(incoming);
+      coverPath = cover ? saved.shift() : null;
+      extraPaths = saved;
     } catch (err) {
       if (!(err instanceof UserError)) throw err;
-      return renderForm(res, { product, form: { ...v.values, active }, errors: v.errors, error: err.message, status: 400 });
+      return renderForm(res, { product, form, errors: v.errors, error: err.message, status: 400 });
     }
 
+    const image_path = coverPath || product.image_path;
     await db.run(
       `UPDATE products SET title = ?, description = ?, price_cents = ?, image_path = ?, type = ?, stock = ?, active = ?
        WHERE id = ?`,
       [v.values.title, v.values.description, v.price_cents, image_path, v.values.type, v.stock, active ? 1 : 0, product.id]
     );
-    if (image_path !== product.image_path) await deleteImage(product.image_path);
+    if (coverPath) await deleteImage(product.image_path);
+    await removeExtras(product.id, removeIds);
+    await addExtras(product.id, extraPaths);
     req.session.flash = { type: 'success', msg: 'Cambios guardados.' };
     res.redirect('/admin');
   })
@@ -191,6 +227,7 @@ router.post(
   wrap(async (req, res) => {
     const product = await findProduct(req);
     if (product) {
+      await removeAllExtras(product.id);
       await db.run('DELETE FROM products WHERE id = ?', [product.id]);
       await deleteImage(product.image_path);
       req.session.flash = { type: 'success', msg: `"${product.title}" eliminado.` };

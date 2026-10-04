@@ -56,6 +56,21 @@
     <input id="image" type="file" name="image" accept="image/png,image/jpeg,image/webp,image/gif" data-preview <%= product ? '' : 'required' %> />
     <p class="field-hint">PNG, JPG, WEBP o GIF. Máximo 8 MB. Mejor cuadrada (por ejemplo 1500 x 1500 px).</p>
   </div>
+  <div class="field">
+    <label for="extra">Imágenes adicionales (opcional, hasta <%= maxExtras %>)</label>
+    <% if (extras.length) { %>
+      <div class="thumb-row">
+        <% extras.forEach((e) => { %>
+          <label class="thumb-remove">
+            <img src="<%= thumb(e.image_path, 200) %>" alt="Imagen adicional" width="90" height="90" />
+            <span class="check"><input type="checkbox" name="remove_extra" value="<%= e.id %>" /> Quitar</span>
+          </label>
+        <% }) %>
+      </div>
+    <% } %>
+    <input id="extra" type="file" name="extra" multiple accept="image/png,image/jpeg,image/webp,image/gif" />
+    <p class="field-hint">Detalles, escala, reverso... Se muestran como galería en la ficha del producto.</p>
+  </div>
   <% if (product) { %>
     <div class="field">
       <label class="check" for="active"><input id="active" type="checkbox" name="active" value="1"<%= f.active ? ' checked' : '' %> /><span>Visible en la tienda</span></label>

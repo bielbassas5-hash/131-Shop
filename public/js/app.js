@@ -72,6 +72,20 @@
     update();
   }
 
+  // Galeria de la ficha de producto: cambia la imagen principal sin recargar
+  var thumbs = document.querySelectorAll('[data-gallery-src]');
+  var mainImg = document.getElementById('main-image');
+  if (thumbs.length && mainImg) {
+    thumbs.forEach(function (a) {
+      a.addEventListener('click', function (e) {
+        e.preventDefault();
+        mainImg.src = a.getAttribute('data-gallery-src');
+        thumbs.forEach(function (t) { t.classList.remove('active'); });
+        a.classList.add('active');
+      });
+    });
+  }
+
   // Vista previa de la imagen en el formulario de producto
   var fileInput = document.querySelector('input[type="file"][data-preview]');
   if (fileInput) {

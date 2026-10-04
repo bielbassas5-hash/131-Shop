@@ -67,10 +67,13 @@ const PNG = Buffer.from(
   'base64'
 );
 
-function productForm(fields, file) {
+function productForm(fields, file, extras = []) {
   const fd = new FormData();
-  for (const [k, v] of Object.entries(fields)) fd.append(k, v);
+  for (const [k, v] of Object.entries(fields)) {
+    for (const item of [].concat(v)) fd.append(k, item);
+  }
   if (file) fd.append('image', new Blob([file.data], { type: file.type }), file.name);
+  for (const x of extras) fd.append('extra', new Blob([x.data], { type: x.type }), x.name);
   return fd;
 }
 
@@ -424,6 +427,41 @@ async function main() {
     check('eliminar producto', del.status === 302 && (await anon.get('/producto/2')).status === 404);
     check('eliminar con pedido asociado no falla', (await admin.post('/admin/productos/1/eliminar', { _csrf: tok })).status === 302);
     check('pedido sigue existiendo', (await admin.get('/admin/pedidos/1')).status === 200);
+
+    console.log('\n# Galeria de imagenes');
+    const countUploads = () => fs.readdirSync(uploadsDir).filter((f) => f !== '.gitkeep').length;
+    const baseline = countUploads();
+    const png = (n) => ({ data: PNG, type: 'image/png', name: `g${n}.png` });
+    const gal = (fields, cover, extras, query = '') =>
+      admin.req('POST', `/admin/productos/nuevo?_csrf=${tok}${query}`, { multipart: productForm(fields, cover, extras) });
+    const fields = { title: 'Con galeria', description: 'x', price: '12', stock: '4', type: 'print' };
+
+    check('mas de 5 extras rechazado', (await gal(fields, png(0), [1, 2, 3, 4, 5, 6].map(png))).status === 400);
+    check('rechazo no deja archivos huerfanos', countUploads() === baseline);
+    const badExtra = { data: Buffer.from('no soy imagen'), type: 'image/png', name: 'x.png' };
+    check('extra falso rechazado', (await gal(fields, png(0), [png(1), badExtra])).status === 400);
+    check('extra falso no deja archivos huerfanos', countUploads() === baseline);
+
+    check('producto con 2 extras creado', (await gal(fields, png(0), [png(1), png(2)])).status === 302);
+    check('se guardan portada + 2 extras', countUploads() === baseline + 3);
+    const galId = (await anon.get('/?q=galeria')).text.match(/\/producto\/(\d+)/)[1];
+    const galPage = await anon.get(`/producto/${galId}`);
+    check('ficha muestra 3 miniaturas', (galPage.text.match(/data-gallery-src/g) || []).length === 3);
+    const editPage = await admin.get(`/admin/productos/${galId}/editar`);
+    const extraIds = [...editPage.text.matchAll(/name="remove_extra" value="(\d+)"/g)].map((m) => m[1]);
+    check('editor lista los extras', extraIds.length === 2);
+
+    const edited = await admin.req('POST', `/admin/productos/${galId}/editar?_csrf=${tok}`, {
+      multipart: productForm({ ...fields, active: '1', remove_extra: [extraIds[0]] }, null, [png(3)]),
+    });
+    check('quitar uno y anadir otro', edited.status === 302);
+    check('ficha sigue con 3 miniaturas', ((await anon.get(`/producto/${galId}`)).text.match(/data-gallery-src/g) || []).length === 3);
+    check('el extra quitado se borra del disco', countUploads() === baseline + 3);
+    check('ids ajenos en remove_extra se ignoran', (await admin.req('POST', `/admin/productos/${galId}/editar?_csrf=${tok}`, {
+      multipart: productForm({ ...fields, active: '1', remove_extra: ['9999', 'abc'] }),
+    })).status === 302);
+
+    check('eliminar producto borra portada y extras', (await admin.post(`/admin/productos/${galId}/eliminar`, { _csrf: tok })).status === 302 && countUploads() === baseline);
 
     console.log('\n# Sesiones y limite de intentos');
     await admin.post('/admin/logout', { _csrf: tok });
