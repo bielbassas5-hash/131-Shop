@@ -16,6 +16,10 @@ const SORTS = {
 
 const SLUG_RE = /^[a-z0-9-]{1,40}$/;
 
+// Primera imagen extra del producto: se muestra al pasar el raton por la tarjeta
+const hoverImage = (alias) =>
+  `(SELECT x.image_path FROM product_images x WHERE x.product_id = ${alias}.id ORDER BY x.position, x.id LIMIT 1) AS hover_image`;
+
 // Catalogo con filtros. `theme` (opcional) agrupa solo los productos de ese tema.
 async function renderCatalog(req, res, theme) {
   const tipo = TYPES.includes(req.query.tipo) ? req.query.tipo : '';
@@ -40,7 +44,7 @@ async function renderCatalog(req, res, theme) {
 
   const [products, themes] = await Promise.all([
     db.all(
-    `SELECT * FROM products WHERE ${where.join(' AND ')}
+    `SELECT products.*, ${hoverImage('products')} FROM products WHERE ${where.join(' AND ')}
      ORDER BY ${trackStock() ? '(stock > 0) DESC,' : ''} ${SORTS[orden]} LIMIT 120`,
     args
     ),
@@ -77,7 +81,7 @@ router.get(
   '/temas',
   wrap(async (req, res) => {
     const rows = await db.all(
-      `SELECT p.*, t.id AS theme_id, t.name AS theme_name, t.slug AS theme_slug
+      `SELECT p.*, ${hoverImage('p')}, t.id AS theme_id, t.name AS theme_name, t.slug AS theme_slug
        FROM products p
        JOIN product_themes pt ON pt.product_id = p.id
        JOIN themes t ON t.id = pt.theme_id
@@ -112,7 +116,7 @@ router.get(
 
     // Relacionados: primero los que comparten tema, luego el mismo tipo
     const relatedQuery = db.all(
-      `SELECT * FROM products p WHERE p.active = 1 ${trackStock() ? 'AND p.stock > 0' : ''} AND p.id != ?
+      `SELECT p.*, ${hoverImage('p')} FROM products p WHERE p.active = 1 ${trackStock() ? 'AND p.stock > 0' : ''} AND p.id != ?
        ORDER BY (SELECT COUNT(*) FROM product_themes a JOIN product_themes b ON a.theme_id = b.theme_id
                  WHERE a.product_id = p.id AND b.product_id = ?) DESC,
                 (p.type = ?) DESC, p.created_at DESC LIMIT 4`,

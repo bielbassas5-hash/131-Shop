@@ -27,14 +27,16 @@
   <div class="product-media">
     <div class="product-gallery">
       <% if (product.image_path) { %>
-        <img id="main-image" src="<%= thumb(product.image_path, 1100) %>" alt="<%= product.title %>" width="1100" height="1100" />
+        <button type="button" class="zoom" data-lightbox data-full="<%= thumb(product.image_path, 2000) %>" aria-label="Ampliar imagen">
+          <img id="main-image" src="<%= thumb(product.image_path, 1100) %>" alt="<%= product.title %>" width="1100" height="1100" />
+        </button>
       <% } %>
     </div>
     <% if (gallery.length > 1) { %>
       <ul class="gallery-thumbs" aria-label="Más imágenes">
         <% gallery.forEach((src, idx) => { %>
           <li>
-            <a href="<%= thumb(src, 1100) %>" data-gallery-src="<%= thumb(src, 1100) %>" class="<%= idx === 0 ? 'active' : '' %>" aria-label="Ver imagen <%= idx + 1 %>">
+            <a href="<%= thumb(src, 1100) %>" data-gallery-src="<%= thumb(src, 1100) %>" data-gallery-full="<%= thumb(src, 2000) %>" class="<%= idx === 0 ? 'active' : '' %>" aria-label="Ver imagen <%= idx + 1 %>">
               <img src="<%= thumb(src, 160) %>" alt="" width="80" height="80" loading="lazy" />
             </a>
           </li>
@@ -81,5 +83,10 @@
     <% related.forEach((p) => { %><%- include('partials/product-card', { p }) %><% }) %>
   </div>
 <% } %>
+
+<dialog class="lightbox" id="lightbox" aria-label="Imagen ampliada">
+  <button type="button" class="lb-close" aria-label="Cerrar" data-lb-close>&times;</button>
+  <div class="lb-body"><img alt="" /></div>
+</dialog>
 
 <%- include('partials/footer') %>

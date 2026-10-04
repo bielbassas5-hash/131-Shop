@@ -15,9 +15,9 @@ Sin `TURSO_*` ni `CLOUDINARY_*` usa un archivo SQLite local (`data/store.db`) y 
 
 ## Qué incluye
 
-**Tienda:** catálogo con filtros, búsqueda y orden · **temas** (montañas, retratos, animales…) con páginas propias y vista agrupada · ficha con galería de hasta 6 imágenes · producción **bajo demanda** (sin stock) con plazo de elaboración · envío fijo o gratis desde un importe · recogida en mano opcional · notas del pedido · seguimiento del pedido por enlace privado · páginas legales (privacidad, condiciones/devoluciones, aviso legal) · SEO (sitemap, Open Graph, datos estructurados).
+**Tienda:** catálogo con filtros, búsqueda y orden · **temas** (montañas, retratos, animales…) con páginas propias y vista agrupada · ficha con galería de hasta 6 imágenes · producción **bajo demanda** (sin stock) con plazo de elaboración · envío fijo o gratis desde un importe · recogida en mano opcional · notas del pedido · seguimiento del pedido por enlace privado (y recuperable con número + email en `/pedido`) · páginas legales (privacidad, condiciones/devoluciones, aviso legal) · SEO (sitemap, Open Graph, datos estructurados).
 
-**Panel (`/admin`):** estadísticas, lista de puesta en marcha, productos (subir, editar, ocultar, borrar), gestión de temas, pedidos con filtros y estados (pendiente → pagado → en producción → enviado), número de seguimiento, exportación CSV y aviso al cliente por email.
+**Panel (`/admin`):** estadísticas (las tarjetas llevan a los pedidos), buscador de pedidos, historial de estados con fechas, copia de seguridad en JSON, lista de puesta en marcha, productos (subir, editar, ocultar, borrar), gestión de temas, pedidos con filtros y estados (pendiente → pagado → en producción → enviado), número de seguimiento, exportación CSV y aviso al cliente por email.
 
 **Cobro:** por defecto **Bizum / transferencia** (sin comisiones; confirmas el pago a mano en el panel). Si defines `STRIPE_SECRET_KEY` se cobra con tarjeta vía Stripe Checkout.
 
@@ -69,9 +69,26 @@ No hay unidades ni "agotado". El límite es de 10 por línea de pedido. La ficha
 
 Define `STRIPE_SECRET_KEY` y crea en Stripe un webhook a `https://TU-WEB/webhooks/stripe` con los eventos `checkout.session.completed` y `checkout.session.expired`; su secreto va en `STRIPE_WEBHOOK_SECRET`.
 
+## Diseño
+
+Obra siempre **entera** sobre un paspartú (nunca recortada), tarjetas tipo cartela, segunda imagen al pasar el ratón cuando el producto tiene galería, imagen ampliable en la ficha y **tema claro / oscuro** (sigue la preferencia del sistema y se puede cambiar con el botón de la cabecera). Los dos temas cumplen contraste AA. Las tipografías (Inter y Space Grotesk, licencia OFL) se sirven desde la propia web.
+
+## Estructura
+
+```
+server.js            configuracion de Express, cabeceras, sesion, CSRF
+db.js                esquema, migraciones y acceso a datos (libSQL / Turso)
+lib/                 pedidos, temas, IA de vision, emails, pagos, validacion, seguridad
+routes/              tienda, carrito, checkout, webhooks
+routes/admin/        auth, dashboard, products, themes, orders (un modulo por responsabilidad)
+views/               plantillas EJS (publicas, legales y de administracion)
+public/              CSS, JS, tipografias
+test/smoke.js        ~220 pruebas automaticas contra un servidor real con base de datos temporal
+```
+
 ## Seguridad (resumen)
 
-CSRF firmado en todos los formularios · CSP estricta sin scripts en línea, HSTS y resto de cabeceras (helmet) · login con límite de intentos, comparación en tiempo constante y sesión regenerada · cookies `HttpOnly`/`SameSite`/`Secure` · pedidos accesibles solo con enlace privado de 128 bits (sin enumeración) · el servidor recalcula siempre precios, envío y totales · stock reservado de forma atómica al pedir (sin sobreventa) · imágenes validadas por su contenido real · plantillas con escape automático · webhook de Stripe con firma, importe y pedido verificados · límite de emails por destinatario · errores sin trazas hacia el visitante · 0 vulnerabilidades conocidas en dependencias (`npm audit`).
+CSRF firmado en todos los formularios · CSP estricta **sin scripts ni estilos en línea** y sin recursos de terceros, HSTS y resto de cabeceras (helmet) · login con límite de intentos **por IP real** (detrás de Cloudflare se usa `CF-Connecting-IP`), comparación en tiempo constante y sesión regenerada · cookies `HttpOnly`/`SameSite`/`Secure` con prefijo `__Host-` en producción · pedidos accesibles solo con enlace privado de 128 bits (sin enumeración) · el servidor recalcula siempre precios, envío y totales · stock reservado de forma atómica al pedir (sin sobreventa) · imágenes validadas por su contenido real · plantillas con escape automático · webhook de Stripe con firma, importe y pedido verificados · límite de emails por destinatario · errores sin trazas hacia el visitante · 0 vulnerabilidades conocidas en dependencias (`npm audit`).
 
 ## Despliegue en Render
 

@@ -72,6 +72,30 @@
     update();
   }
 
+  // Cambio de tema claro / oscuro (se recuerda en este navegador)
+  var themeBtn = document.querySelector('[data-theme-toggle]');
+  if (themeBtn) {
+    themeBtn.addEventListener('click', function () {
+      var root = document.documentElement;
+      var current = root.getAttribute('data-theme') || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+      var next = current === 'light' ? 'dark' : 'light';
+      root.setAttribute('data-theme', next);
+      try { localStorage.setItem('theme', next); } catch (e) { /* ignorado */ }
+    });
+  }
+
+  // Imagen ampliada (ficha de producto)
+  var lightbox = document.getElementById('lightbox');
+  var zoomBtn = document.querySelector('[data-lightbox]');
+  if (lightbox && zoomBtn && typeof lightbox.showModal === 'function') {
+    var lbImg = lightbox.querySelector('img');
+    zoomBtn.addEventListener('click', function () {
+      lbImg.src = zoomBtn.getAttribute('data-full');
+      lightbox.showModal();
+    });
+    lightbox.addEventListener('click', function () { lightbox.close(); }); // clic en cualquier parte cierra
+  }
+
   // Galeria de la ficha de producto: cambia la imagen principal sin recargar
   var thumbs = document.querySelectorAll('[data-gallery-src]');
   var mainImg = document.getElementById('main-image');
@@ -80,6 +104,7 @@
       a.addEventListener('click', function (e) {
         e.preventDefault();
         mainImg.src = a.getAttribute('data-gallery-src');
+        if (zoomBtn) zoomBtn.setAttribute('data-full', a.getAttribute('data-gallery-full') || a.getAttribute('data-gallery-src'));
         thumbs.forEach(function (t) { t.classList.remove('active'); });
         a.classList.add('active');
       });
