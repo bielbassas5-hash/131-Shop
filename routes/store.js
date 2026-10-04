@@ -4,6 +4,7 @@ const { wrap } = require('../lib/security');
 const { TYPES, TYPE_LABELS, TYPE_PLURALS } = require('../lib/format');
 const { extrasOf } = require('../lib/productImages');
 const themesLib = require('../lib/themes');
+const { trackStock } = require('../lib/orders');
 
 const router = express.Router();
 
@@ -39,7 +40,7 @@ async function renderCatalog(req, res, theme) {
 
   const products = await db.all(
     `SELECT * FROM products WHERE ${where.join(' AND ')}
-     ORDER BY (stock > 0) DESC, ${SORTS[orden]} LIMIT 120`,
+     ORDER BY ${trackStock() ? '(stock > 0) DESC,' : ''} ${SORTS[orden]} LIMIT 120`,
     args
   );
 
@@ -76,7 +77,7 @@ router.get(
        JOIN product_themes pt ON pt.product_id = p.id
        JOIN themes t ON t.id = pt.theme_id
        WHERE p.active = 1
-       ORDER BY t.name COLLATE NOCASE, (p.stock > 0) DESC, p.created_at DESC`
+       ORDER BY t.name COLLATE NOCASE, ${trackStock() ? '(p.stock > 0) DESC,' : ''} p.created_at DESC`
     );
     const groups = [];
     const byId = new Map();
@@ -107,7 +108,7 @@ router.get(
     const productThemes = await themesLib.themesOf(product.id);
     // Relacionados: primero los que comparten tema, luego el mismo tipo
     const related = await db.all(
-      `SELECT * FROM products p WHERE p.active = 1 AND p.stock > 0 AND p.id != ?
+      `SELECT * FROM products p WHERE p.active = 1 ${trackStock() ? 'AND p.stock > 0' : ''} AND p.id != ?
        ORDER BY (SELECT COUNT(*) FROM product_themes a JOIN product_themes b ON a.theme_id = b.theme_id
                  WHERE a.product_id = p.id AND b.product_id = ?) DESC,
                 (p.type = ?) DESC, p.created_at DESC LIMIT 4`,

@@ -1,6 +1,6 @@
 <%- include('partials/header') %>
 <%
-  const soldOut = product.stock <= 0;
+  const soldOut = shop.trackStock && product.stock <= 0;
   const jsonLd = JSON.stringify({
     '@context': 'https://schema.org',
     '@type': 'Product',
@@ -61,13 +61,14 @@
           <input type="hidden" name="back" value="/producto/<%= product.id %>" />
           <button class="btn block" type="submit">Añadir al carrito</button>
         </form>
-        <% if (product.stock <= 3) { %><p class="stock-note">Solo quedan <%= product.stock %> unidades.</p><% } %>
+        <% if (shop.trackStock && product.stock <= 3) { %><p class="stock-note">Solo quedan <%= product.stock %> unidades.</p><% } %>
       <% } else { %>
         <button class="btn block" type="button" disabled>Agotado</button>
         <p class="stock-note">Esta pieza ya no está disponible.</p>
       <% } %>
       <ul>
         <li>Envío <%= shop.freeFrom ? 'desde ' + euro(shop.shippingCents) + ', gratis a partir de ' + euro(shop.freeFrom) : 'a ' + euro(shop.shippingCents) + ' por pedido' %></li>
+        <% if (!shop.trackStock) { %><li>Se elabora bajo pedido<%= shop.leadTime ? ' · plazo de ' + shop.leadTime : '' %></li><% } %>
         <li><a class="link" href="/legal/condiciones">Devoluciones en 14 días</a></li>
       </ul>
     </div>

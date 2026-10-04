@@ -7,10 +7,10 @@
   <h1>Condiciones de compra, envíos y devoluciones</h1>
 
   <h2>Productos y precios</h2>
-  <p>Las cantidades disponibles se indican en cada producto. Los precios se muestran en euros. Pueden existir ligeras diferencias de color entre la pantalla y la obra física.</p>
+  <p><% if (shop.trackStock) { %>Las cantidades disponibles se indican en cada producto.<% } else { %>Los productos se elaboran bajo pedido<%= shop.leadTime ? ' (plazo de elaboración orientativo: ' + shop.leadTime + ')' : '' %>, por lo que el plazo de preparación es mayor que el de un envío inmediato.<% } %> Los precios se muestran en euros. Pueden existir ligeras diferencias de color entre la pantalla y la obra física.</p>
 
   <h2>Como comprar y pagar</h2>
-  <p>Añade los artículos al carrito, indica tus datos de envío y confirma el pedido. Al confirmar, las unidades quedan reservadas para ti. El pago se realiza por los medios indicados al finalizar el pedido (Bizum, transferencia bancaria o tarjeta, según disponibilidad). El pedido se prepara una vez confirmado el pago; si no se recibe en un plazo razonable de pocos días, el pedido se cancela y las unidades vuelven a estar disponibles.</p>
+  <p>Añade los artículos al carrito, indica tus datos de envío y confirma el pedido. Al confirmar, <%= shop.trackStock ? 'las unidades quedan reservadas para ti' : 'registramos tu pedido' %>. El pago se realiza por los medios indicados al finalizar el pedido (Bizum, transferencia bancaria o tarjeta, según disponibilidad). El pedido se prepara una vez confirmado el pago; si no se recibe en un plazo razonable de pocos días, el pedido se cancela<%= shop.trackStock ? ' y las unidades vuelven a estar disponibles' : '' %>.</p>
 
   <h2>Envíos</h2>
   <ul>

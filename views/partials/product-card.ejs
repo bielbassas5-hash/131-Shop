@@ -1,4 +1,4 @@
-<% const soldOut = p.stock <= 0; const low = !soldOut && p.stock <= 2; %>
+<% const soldOut = shop.trackStock && p.stock <= 0; const low = shop.trackStock && !soldOut && p.stock <= 2; %>
 <a class="card<%= soldOut ? ' soldout' : '' %>" href="/producto/<%= p.id %>">
   <div class="card-media">
     <% if (p.image_path) { %>

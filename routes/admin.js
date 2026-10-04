@@ -7,7 +7,7 @@ const { deleteImage, UserError } = require('../lib/imageStorage');
 const { MAX_EXTRAS, extrasOf, validateFiles, saveMany, addExtras, removeExtras, removeAllExtras } = require('../lib/productImages');
 const { wrap, createLimiter, safeEqual } = require('../lib/security');
 const { validateProduct, text } = require('../lib/validate');
-const { STATUSES, setStatus, paymentInfo, StockError } = require('../lib/orders');
+const { STATUSES, setStatus, paymentInfo, trackStock, StockError } = require('../lib/orders');
 const { stripeConfigured } = require('../lib/payments');
 const { STATUS_LABELS } = require('../lib/format');
 const notify = require('../lib/notify');
@@ -115,8 +115,8 @@ router.get(
       revenue: Number(revenue.total),
       pending: byStatus.pending || 0,
       toShip: byStatus.paid || 0,
-      soldOut: products.filter((p) => p.active && p.stock <= 0).length,
-      lowStock: products.filter((p) => p.active && p.stock > 0 && p.stock <= 2).length,
+      soldOut: trackStock() ? products.filter((p) => p.active && p.stock <= 0).length : 0,
+      lowStock: trackStock() ? products.filter((p) => p.active && p.stock > 0 && p.stock <= 2).length : 0,
     };
     res.render('admin/dashboard', {
       products,

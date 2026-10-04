@@ -43,7 +43,7 @@
         <select id="status" name="status">
           <% statuses.forEach((s) => { %><option value="<%= s %>"<%= order.status === s ? ' selected' : '' %>><%= STATUS_LABELS[s] %></option><% }) %>
         </select>
-        <p class="field-hint">Al cancelar, las unidades vuelven al stock.</p>
+        <% if (shop.trackStock) { %><p class="field-hint">Al cancelar, las unidades vuelven al stock.</p><% } %>
       </div>
       <div class="field">
         <label for="tracking">Número de seguimiento</label>

@@ -1,7 +1,7 @@
 const express = require('express');
 const db = require('../db');
 const { wrap, createLimiter } = require('../lib/security');
-const { loadCart, MAX_PER_LINE } = require('../lib/orders');
+const { loadCart, trackStock, MAX_PER_LINE } = require('../lib/orders');
 
 const router = express.Router();
 const cartLimiter = createLimiter({ windowMs: 10 * 60 * 1000, max: 120 });
@@ -31,9 +31,9 @@ router.post(
 
     const cart = getCart(req);
     const current = cart[id] || 0;
-    const limit = Math.min(product.stock, MAX_PER_LINE);
+    const limit = trackStock() ? Math.min(product.stock, MAX_PER_LINE) : MAX_PER_LINE;
 
-    if (product.stock <= 0) {
+    if (trackStock() && product.stock <= 0) {
       req.session.flash = { type: 'error', msg: `"${product.title}" está agotado.` };
     } else if (current >= limit) {
       req.session.flash = { type: 'info', msg: `Ya tienes el máximo disponible de "${product.title}" en el carrito.` };
@@ -61,7 +61,7 @@ router.post(
       if (!Number.isInteger(qty) || qty < 1) {
         delete cart[id];
       } else {
-        cart[id] = Math.min(qty, MAX_PER_LINE); // loadCart ajusta luego al stock real
+        cart[id] = Math.min(qty, MAX_PER_LINE); // loadCart lo ajusta luego al limite real
       }
     }
     res.redirect('/carrito');

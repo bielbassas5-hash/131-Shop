@@ -147,6 +147,7 @@ const baseEnv = () => ({
   OWNER_EMAIL: 'owner@example.com',
   MAIL_API_URL: `http://127.0.0.1:${MAIL_PORT}/send`,
   SITE_URL: 'https://tienda.test',
+  TRACK_STOCK: '1', // las suites generales cubren el modo opcional con stock
   ANTHROPIC_API_KEY: 'test-anthropic-key',
   ANTHROPIC_BASE_URL: `http://127.0.0.1:${AI_PORT}`,
 });
@@ -254,6 +255,85 @@ async function suiteStripe() {
     srv.kill();
     await sleep(300);
     for (const f of [dbFile, dbFile + '-wal', dbFile + '-shm']) { try { fs.rmSync(f, { force: true }); } catch (_) { /* archivo aun bloqueado en Windows: queda en la carpeta temporal */ } }
+  }
+}
+
+// Modo por defecto: produccion bajo demanda (sin stock, sin "agotado", sin "ultimas unidades").
+async function suiteMadeToOrder() {
+  console.log('\n# Produccion bajo demanda (sin stock)');
+  const port = 3060;
+  const base = `http://127.0.0.1:${port}`;
+  const dbFile = path.join(os.tmpdir(), `tienda131-test4-${Date.now()}.db`);
+  const srv = spawn(process.execPath, ['server.js'], {
+    cwd: path.join(__dirname, '..'),
+    env: {
+      ...baseEnv(), PORT: String(port), TURSO_DATABASE_URL: 'file:' + dbFile.replace(/\\/g, '/'),
+      STRIPE_SECRET_KEY: '', TRACK_STOCK: '', LEAD_TIME: '5-7 días laborables', ANTHROPIC_API_KEY: '',
+    },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  let log4 = '';
+  srv.stdout.on('data', (d) => (log4 += d));
+  srv.stderr.on('data', (d) => (log4 += d));
+  const uploadsBefore = fs.readdirSync(uploadsDir).length;
+  try {
+    await waitForServer(base);
+    const admin = new Client(base);
+    const lt = (await admin.get('/admin/login')).text.match(/name="_csrf" value="([a-f0-9]+)"/)[1];
+    await admin.post('/admin/login', { _csrf: lt, password: ADMIN_PASSWORD });
+    const tok = (await admin.get('/admin')).text.match(/name="_csrf" value="([a-f0-9]+)"/)[1];
+
+    const form = (await admin.get('/admin/productos/nuevo')).text;
+    check('el formulario no pide unidades', !/Unidades disponibles/.test(form) && !/name="stock"/.test(form));
+    const dash = (await admin.get('/admin')).text;
+    check('el panel no muestra stock ni agotados', !/Productos agotados|Con poco stock|<th>Stock<\/th>/.test(dash));
+
+    const create = (fields) => admin.req('POST', `/admin/productos/nuevo?_csrf=${tok}`, {
+      multipart: productForm(fields, { data: PNG, type: 'image/png', name: 'a.png' }),
+    });
+    check('crear producto sin campo de stock', (await create({ title: 'Bajo demanda', description: 'x', price: '25', type: 'print' })).status === 302);
+    check('un stock manipulado en el formulario se ignora', (await create({ title: 'Otro', price: '5', type: 'sticker', stock: '-5' })).status === 302);
+
+    const anon = new Client(base);
+    const home = (await anon.get('/')).text;
+    check('ambos productos visibles', home.includes('Bajo demanda') && home.includes('Otro'));
+    check('sin "Agotado" ni "Ultimas unidades"', !/Agotado|Últimas unidades|Ultimas unidades/.test(home));
+    const prod = (await anon.get('/producto/1')).text;
+    check('la ficha no muestra unidades', !/Solo quedan|unidades|Agotado/.test(prod) && /Añadir al carrito/.test(prod));
+    check('la ficha indica elaboracion bajo pedido y plazo', /Se elabora bajo pedido/.test(prod) && prod.includes('5-7 días laborables'));
+    check('JSON-LD siempre disponible', /schema.org\/InStock/.test(prod) && !/OutOfStock/.test(prod));
+    check('condiciones mencionan elaboracion bajo pedido', /se elaboran bajo pedido/.test((await anon.get('/legal/condiciones')).text));
+
+    // Sin limite de unidades: el unico tope es el de 10 por linea
+    const buyer = new Client(base);
+    const bt = await buyer.csrf('/producto/1');
+    for (let i = 0; i < 12; i++) await buyer.post('/agregar/1', { _csrf: bt, back: '/' });
+    const cart = (await buyer.get('/carrito')).text;
+    check('se pueden pedir hasta 10 por linea', /<option value="10" selected>/.test(cart) && !/<option value="11"/.test(cart));
+    const bt2 = await buyer.csrf('/checkout');
+    const data = { _csrf: bt2, name: 'Eva Ruiz', email: 'eva@example.com', address: 'Calle Sol 5', city: 'Sevilla', postal_code: '41001', country: 'ES', accept: '1' };
+    const o1 = await buyer.post('/checkout/crear', data);
+    check('pedido de 10 unidades aceptado', o1.status === 302 && /^\/pedido\//.test(o1.location || ''));
+    const again = new Client(base);
+    const at = await again.csrf('/producto/1');
+    for (let i = 0; i < 10; i++) await again.post('/agregar/1', { _csrf: at, back: '/' });
+    const at2 = await again.csrf('/checkout');
+    check('el mismo producto se puede volver a pedir (no se agota)', (await again.post('/checkout/crear', { ...data, _csrf: at2 })).status === 302);
+    check('el producto sigue disponible tras los pedidos', /Añadir al carrito/.test((await anon.get('/producto/1')).text));
+
+    // Cancelar un pedido no toca ningun stock
+    const orderPage = await buyer.get(o1.location);
+    check('la pagina del pedido no habla de unidades', !/unidades volver/.test(orderPage.text));
+    check('sin errores en el log (bajo demanda)', !/\[error\]|unhandledRejection|uncaughtException/.test(log4), log4.slice(-500));
+  } finally {
+    srv.kill();
+    await sleep(300);
+    for (const f of [dbFile, dbFile + '-wal', dbFile + '-shm']) { try { fs.rmSync(f, { force: true }); } catch (_) { /* bloqueado en Windows */ } }
+    for (const f of fs.readdirSync(uploadsDir)) {
+      const full = path.join(uploadsDir, f);
+      if (f !== '.gitkeep' && fs.statSync(full).mtimeMs >= startedAt - 1000) { try { fs.rmSync(full, { force: true }); } catch (_) { /* ignorado */ } }
+    }
+    void uploadsBefore;
   }
 }
 
@@ -692,6 +772,7 @@ async function main() {
 
     await suiteStripe();
     await suiteProdAndMigration();
+    await suiteMadeToOrder();
   } finally {
     server.kill();
     mailSrv.close();

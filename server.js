@@ -10,7 +10,7 @@ const db = require('./db');
 const DbStore = require('./lib/sessionStore');
 const { csrf } = require('./lib/security');
 const { euro, dateTime, thumb, TYPE_LABELS, TYPE_PLURALS, STATUS_LABELS } = require('./lib/format');
-const { shippingCost, freeShippingThreshold, expirePending } = require('./lib/orders');
+const { shippingCost, freeShippingThreshold, expirePending, trackStock } = require('./lib/orders');
 
 const storeRoutes = require('./routes/store');
 const cartRoutes = require('./routes/cart');
@@ -103,6 +103,8 @@ app.use((req, res, next) => {
     shippingCents: shippingCost(),
     freeFrom: freeShippingThreshold(),
     contactEmail: process.env.CONTACT_EMAIL || '',
+    trackStock: trackStock(),
+    leadTime: (process.env.LEAD_TIME || '').slice(0, 60),
     pickupEnabled: process.env.PICKUP_ENABLED === '1',
     pickupNote: (process.env.PICKUP_NOTE || '').slice(0, 200),
     instagram: (process.env.INSTAGRAM || '').replace(/^@/, '').replace(/[^\w.]/g, ''),

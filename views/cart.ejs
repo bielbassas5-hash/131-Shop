@@ -11,7 +11,7 @@
 <% } else { %>
   <div class="layout-2">
     <section class="panel" aria-label="Artículos">
-      <% cart.items.forEach((i) => { const max = Math.min(i.stock, 10); %>
+      <% cart.items.forEach((i) => { const max = shop.trackStock ? Math.min(i.stock, 10) : 10; %>
         <div class="cart-line">
           <a href="/producto/<%= i.id %>">
             <% if (i.image_path) { %><img src="<%= thumb(i.image_path, 200) %>" alt="<%= i.title %>" width="84" height="84" /><% } %>

@@ -38,7 +38,7 @@
           <div class="pay-row"><div><small>Concepto</small><b>Pedido #<%= order.id %></b></div><button class="btn small secondary" type="button" data-copy="Pedido #<%= order.id %>">Copiar</button></div>
           <div class="pay-row"><div><small>Importe exacto</small><b><%= euro(order.total_cents) %></b></div></div>
         </div>
-        <small>Si no recibimos el pago en unos días, el pedido se cancelara y las unidades volveran a estar disponibles.</small>
+        <small>Si no recibimos el pago en unos días, el pedido se cancelará<%= shop.trackStock ? ' y las unidades volverán a estar disponibles' : '' %>.</small>
       </section>
     <% } else if (st === 'pending') { %>
       <div class="flash info"><div class="flash-body">Estamos esperando la confirmación del pago.</div></div>

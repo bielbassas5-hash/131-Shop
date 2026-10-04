@@ -38,9 +38,11 @@
       <%- err('price') %>
     </div>
     <div class="field">
+      <% if (shop.trackStock) { %>
       <label for="stock">Unidades disponibles</label>
       <input id="stock" type="number" min="0" max="9999" name="stock" value="<%= f.stock %>" required />
       <%- err('stock') %>
+      <% } %>
     </div>
   </div>
   <div class="field">
