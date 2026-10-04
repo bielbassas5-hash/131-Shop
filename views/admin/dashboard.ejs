@@ -1,51 +1,59 @@
-<% pageTitle = 'Panel admin' %>
 <%- include('../partials/header') %>
 
-<div class="admin-topbar">
-  <h1>Productos</h1>
-  <div class="admin-actions">
-    <a class="btn secondary" href="/admin/pedidos">Ver pedidos</a>
+<div class="admin-top">
+  <h1>Panel</h1>
+  <div class="table-actions">
+    <a class="btn secondary" href="/admin/pedidos">Pedidos</a>
     <a class="btn" href="/admin/productos/nuevo">+ Nuevo producto</a>
     <form method="POST" action="/admin/logout">
-      <button class="btn secondary" type="submit">Salir</button>
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+      <button class="btn ghost" type="submit">Salir</button>
     </form>
   </div>
 </div>
 
-<% if (products.length === 0) { %>
-  <div class="empty-state"><p>No hay productos todavia.</p></div>
+<% if (weakPassword) { %>
+  <div class="flash warn" role="alert"><div class="flash-body"><b>Cambia la contraseña de administrador.</b> La actual es corta o muy común. En Render: Environment &rarr; <code>ADMIN_PASSWORD</code> (usa 12 caracteres o más).</div></div>
+<% } %>
+
+<div class="stats">
+  <div class="stat"><b><%= euro(stats.revenue) %></b><span>Ingresos confirmados</span></div>
+  <div class="stat<%= stats.pending ? ' alert' : '' %>"><b><%= stats.pending %></b><span>Pedidos pendientes de pago</span></div>
+  <div class="stat<%= stats.toShip ? ' alert' : '' %>"><b><%= stats.toShip %></b><span>Pagados, por enviar</span></div>
+  <div class="stat"><b><%= stats.soldOut %></b><span>Productos agotados</span></div>
+  <div class="stat"><b><%= stats.lowStock %></b><span>Con poco stock (&le; 2)</span></div>
+</div>
+
+<h2>Productos</h2>
+<% if (!products.length) { %>
+  <div class="empty-state"><p>Todavía no hay productos.</p><a class="btn" href="/admin/productos/nuevo">Subir el primero</a></div>
 <% } else { %>
-  <table class="simple">
-    <thead>
-      <tr>
-        <th></th>
-        <th>Titulo</th>
-        <th>Tipo</th>
-        <th>Precio</th>
-        <th>Stock</th>
-        <th>Estado</th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody>
-      <% products.forEach(p => { %>
-        <tr>
-          <td><% if (p.image_path) { %><img class="thumb-sm" src="<%= p.image_path %>" alt="" /><% } %></td>
-          <td><%= p.title %></td>
-          <td><%= p.type %></td>
-          <td><%= (p.price_cents / 100).toFixed(2) %> &euro;</td>
-          <td><%= p.stock %></td>
-          <td><%= p.active ? 'Activo' : 'Oculto' %></td>
-          <td style="display:flex; gap:8px;">
-            <a class="btn small secondary" href="/admin/productos/<%= p.id %>/editar">Editar</a>
-            <form method="POST" action="/admin/productos/<%= p.id %>/eliminar" onsubmit="return confirm('Eliminar este producto?');">
-              <button class="btn small danger" type="submit">Eliminar</button>
-            </form>
-          </td>
-        </tr>
-      <% }) %>
-    </tbody>
-  </table>
+  <div class="table-wrap">
+    <table class="simple">
+      <thead><tr><th></th><th>Título</th><th>Tipo</th><th>Precio</th><th>Stock</th><th>Estado</th><th></th></tr></thead>
+      <tbody>
+        <% products.forEach((p) => { %>
+          <tr>
+            <td><% if (p.image_path) { %><img class="thumb-sm" src="<%= thumb(p.image_path, 120) %>" alt="" width="52" height="52" /><% } %></td>
+            <td><a class="link" href="/producto/<%= p.id %>"><%= p.title %></a></td>
+            <td><%= TYPE_LABELS[p.type] || p.type %></td>
+            <td><%= euro(p.price_cents) %></td>
+            <td><%= p.stock %><% if (p.active && p.stock <= 0) { %> <span class="badge cancelled">Agotado</span><% } %></td>
+            <td><span class="badge <%= p.active ? 'paid' : 'hidden' %>"><%= p.active ? 'Visible' : 'Oculto' %></span></td>
+            <td>
+              <div class="table-actions">
+                <a class="btn small secondary" href="/admin/productos/<%= p.id %>/editar">Editar</a>
+                <form method="POST" action="/admin/productos/<%= p.id %>/eliminar" data-confirm="Eliminar &quot;<%= p.title %>&quot;? Esta acción no se puede deshacer.">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+                  <button class="btn small danger" type="submit">Eliminar</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
 <% } %>
 
 <%- include('../partials/footer') %>

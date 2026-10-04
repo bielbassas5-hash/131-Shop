@@ -1,29 +1,67 @@
-<% pageTitle = product.title %>
 <%- include('partials/header') %>
+<%
+  const soldOut = product.stock <= 0;
+  const jsonLd = JSON.stringify({
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: product.title,
+    description: product.description || product.title,
+    image: product.image_path ? (/^https?:/.test(product.image_path) ? product.image_path : shop.siteUrl + product.image_path) : undefined,
+    brand: { '@type': 'Brand', name: artistName },
+    offers: {
+      '@type': 'Offer',
+      priceCurrency: 'EUR',
+      price: (product.price_cents / 100).toFixed(2),
+      availability: soldOut ? 'https://schema.org/OutOfStock' : 'https://schema.org/InStock',
+      url: shop.siteUrl + '/producto/' + product.id
+    }
+  }).replace(/</g, '\\u003c');
+%>
+<script type="application/ld+json"><%- jsonLd %></script>
+
+<nav class="crumbs" aria-label="Migas de pan">
+  <a href="/">Tienda</a> / <a href="/?tipo=<%= product.type %>"><%= TYPE_PLURALS[product.type] || product.type %></a> / <span><%= product.title %></span>
+</nav>
 
 <div class="product-detail">
-  <div class="thumb">
+  <div class="product-gallery">
     <% if (product.image_path) { %>
-      <img src="<%= product.image_path %>" alt="<%= product.title %>" />
+      <img src="<%= thumb(product.image_path, 1100) %>" alt="<%= product.title %>" width="1100" height="1100" />
     <% } %>
   </div>
-  <div class="info">
-    <span class="type-tag"><%= product.type %></span>
-    <h1><%= product.title %></h1>
-    <div class="price"><%= (product.price_cents / 100).toFixed(2) %> &euro;</div>
-    <p class="desc"><%= product.description %></p>
 
-    <% if (product.stock > 0) { %>
-      <form method="POST" action="/agregar/<%= product.id %>">
-        <button class="btn" type="submit">Anadir al carrito</button>
-      </form>
-      <% if (product.stock <= 3) { %>
-        <p class="stock-note">Quedan solo <%= product.stock %> unidades.</p>
+  <div class="product-info">
+    <span class="tag"><%= TYPE_LABELS[product.type] || product.type %></span>
+    <h1><%= product.title %></h1>
+    <span class="price"><%= euro(product.price_cents) %></span>
+    <% if (product.description) { %><p class="desc"><%= product.description %></p><% } %>
+
+    <div class="buy-box">
+      <% if (!soldOut) { %>
+        <form method="POST" action="/agregar/<%= product.id %>">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+          <input type="hidden" name="back" value="/producto/<%= product.id %>" />
+          <button class="btn block" type="submit">Añadir al carrito</button>
+        </form>
+        <% if (product.stock <= 3) { %><p class="stock-note">Solo quedan <%= product.stock %> unidades.</p><% } %>
+      <% } else { %>
+        <button class="btn block" type="button" disabled>Agotado</button>
+        <p class="stock-note">Esta pieza ya no está disponible.</p>
       <% } %>
-    <% } else { %>
-      <p class="stock-note">Agotado.</p>
-    <% } %>
+      <ul>
+        <li>Envío <%= shop.freeFrom ? 'desde ' + euro(shop.shippingCents) + ', gratis a partir de ' + euro(shop.freeFrom) : 'a ' + euro(shop.shippingCents) + ' por pedido' %></li>
+        <li>Hecho a mano, edición limitada</li>
+        <li><a class="link" href="/legal/condiciones">Devoluciones en 14 días</a></li>
+      </ul>
+    </div>
   </div>
 </div>
+
+<% if (related.length) { %>
+  <div class="section-title"><h2>También te puede gustar</h2></div>
+  <div class="grid">
+    <% related.forEach((p) => { %><%- include('partials/product-card', { p }) %><% }) %>
+  </div>
+<% } %>
 
 <%- include('partials/footer') %>

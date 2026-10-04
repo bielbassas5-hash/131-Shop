@@ -6,6 +6,54 @@ const authToken = process.env.TURSO_AUTH_TOKEN || undefined;
 
 const client = createClient({ url, authToken });
 
+function wrap(exec) {
+  return {
+    async get(sql, args = []) {
+      const res = await exec({ sql, args });
+      return res.rows[0];
+    },
+    async all(sql, args = []) {
+      const res = await exec({ sql, args });
+      return res.rows;
+    },
+    async run(sql, args = []) {
+      const res = await exec({ sql, args });
+      return {
+        lastInsertRowid: res.lastInsertRowid != null ? Number(res.lastInsertRowid) : null,
+        changes: Number(res.rowsAffected),
+      };
+    },
+  };
+}
+
+const base = wrap((stmt) => client.execute(stmt));
+
+// Ejecuta fn dentro de una transaccion de escritura; si lanza, se revierte todo.
+async function transaction(fn) {
+  const tx = await client.transaction('write');
+  try {
+    const out = await fn(wrap((stmt) => tx.execute(stmt)));
+    await tx.commit();
+    return out;
+  } catch (err) {
+    try {
+      await tx.rollback();
+    } catch (_) {
+      /* ya revertida */
+    }
+    throw err;
+  } finally {
+    tx.close();
+  }
+}
+
+async function ensureColumn(table, column, ddl) {
+  const cols = await base.all(`PRAGMA table_info(${table})`);
+  if (!cols.some((c) => c.name === column)) {
+    await client.execute(`ALTER TABLE ${table} ADD COLUMN ${column} ${ddl}`);
+  }
+}
+
 async function migrate() {
   await client.executeMultiple(`
     CREATE TABLE IF NOT EXISTS products (
@@ -22,12 +70,15 @@ async function migrate() {
 
     CREATE TABLE IF NOT EXISTS orders (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+      token TEXT,
       stripe_session_id TEXT UNIQUE,
       customer_email TEXT,
       customer_name TEXT,
       shipping_address TEXT,
       total_cents INTEGER NOT NULL DEFAULT 0,
+      shipping_cents INTEGER NOT NULL DEFAULT 0,
       status TEXT NOT NULL DEFAULT 'pending',
+      tracking_number TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
@@ -39,25 +90,29 @@ async function migrate() {
       price_cents INTEGER NOT NULL,
       quantity INTEGER NOT NULL DEFAULT 1
     );
+
+    CREATE TABLE IF NOT EXISTS sessions (
+      sid TEXT PRIMARY KEY,
+      data TEXT NOT NULL,
+      expires INTEGER NOT NULL
+    );
+  `);
+
+  // Bases de datos creadas con versiones anteriores
+  await ensureColumn('orders', 'token', 'TEXT');
+  await ensureColumn('orders', 'shipping_cents', 'INTEGER NOT NULL DEFAULT 0');
+  await ensureColumn('orders', 'tracking_number', 'TEXT');
+  await client.execute(
+    "UPDATE orders SET token = lower(hex(randomblob(16))) WHERE token IS NULL OR token = ''"
+  );
+
+  await client.executeMultiple(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_token ON orders(token);
+    CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status, created_at);
+    CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);
+    CREATE INDEX IF NOT EXISTS idx_products_active ON products(active, created_at);
+    CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires);
   `);
 }
 
-async function get(sql, args = []) {
-  const res = await client.execute({ sql, args });
-  return res.rows[0];
-}
-
-async function all(sql, args = []) {
-  const res = await client.execute({ sql, args });
-  return res.rows;
-}
-
-async function run(sql, args = []) {
-  const res = await client.execute({ sql, args });
-  return {
-    lastInsertRowid: Number(res.lastInsertRowid),
-    changes: Number(res.rowsAffected),
-  };
-}
-
-module.exports = { migrate, get, all, run };
+module.exports = { ...base, migrate, transaction };

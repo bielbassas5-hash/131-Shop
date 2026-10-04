@@ -1,0 +1,9 @@
+<% if (flash) { %>
+  <div class="flash <%= ['success','error','info','warn'].includes(flash.type) ? flash.type : 'info' %>" role="<%= flash.type === 'error' ? 'alert' : 'status' %>">
+    <div class="flash-body">
+      <%= flash.msg %>
+      <% if (flash.cta) { %> <a href="/carrito">Ver carrito</a><% } %>
+    </div>
+    <button type="button" data-dismiss aria-label="Cerrar aviso">&times;</button>
+  </div>
+<% } %>

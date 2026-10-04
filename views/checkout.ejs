@@ -1,65 +1,86 @@
-<% pageTitle = 'Pago' %>
 <%- include('partials/header') %>
+<%
+  const v = values || {};
+  const e = errors || {};
+  const err = (k) => e[k] ? '<p class="field-error" id="err-' + k + '">' + e[k].replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</p>' : '';
+  const bad = (k) => e[k] ? 'aria-invalid="true" aria-describedby="err-' + k + '"' : '';
+%>
 
-<h1>Datos de envio</h1>
+<h1>Datos de envío</h1>
 
+<% if (Object.keys(e).length) { %>
+  <div class="flash error" role="alert"><div class="flash-body">Revisa los campos marcados para continuar.</div></div>
+<% } %>
 <% if (!stripeConfigured) { %>
-  <div class="alert info">
-    El pago se hara por transferencia bancaria o Bizum. Tras confirmar el pedido veras los datos para pagar.
-  </div>
+  <div class="flash info"><div class="flash-body">El pago se hace por <b>Bizum o transferencia bancaria</b>. Al confirmar el pedido verás los datos para pagar.</div></div>
 <% } %>
 
-<div class="row2" style="align-items:start;">
-  <form class="stack" method="POST" action="/checkout/crear">
-    <div>
-      <label>Nombre completo</label>
-      <input type="text" name="name" required />
-    </div>
-    <div>
-      <label>Email</label>
-      <input type="email" name="email" required />
-    </div>
-    <div>
-      <label>Direccion</label>
-      <input type="text" name="address" required />
+<div class="layout-2">
+  <form class="panel" method="POST" action="/checkout/crear" data-once novalidate>
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+
+    <div class="field">
+      <label for="name">Nombre completo</label>
+      <input id="name" type="text" name="name" value="<%= v.name || '' %>" autocomplete="name" maxlength="80" required <%- bad('name') %> />
+      <%- err('name') %>
     </div>
     <div class="row2">
-      <div>
-        <label>Ciudad</label>
-        <input type="text" name="city" required />
+      <div class="field">
+        <label for="email">Email</label>
+        <input id="email" type="email" name="email" value="<%= v.email || '' %>" autocomplete="email" maxlength="120" required <%- bad('email') %> />
+        <%- err('email') %>
       </div>
-      <div>
-        <label>Codigo postal</label>
-        <input type="text" name="postal_code" required />
+      <div class="field">
+        <label for="phone">Teléfono (opcional)</label>
+        <input id="phone" type="tel" name="phone" value="<%= v.phone || '' %>" autocomplete="tel" maxlength="20" <%- bad('phone') %> />
+        <%- err('phone') %>
       </div>
     </div>
-    <div>
-      <label>Pais</label>
-      <input type="text" name="country" value="ES" required />
+    <div class="field">
+      <label for="address">Dirección</label>
+      <input id="address" type="text" name="address" value="<%= v.address || '' %>" autocomplete="street-address" maxlength="120" required <%- bad('address') %> />
+      <%- err('address') %>
     </div>
-    <button class="btn block" type="submit">
-      <%= stripeConfigured ? 'Continuar al pago con tarjeta' : 'Confirmar pedido' %>
-    </button>
+    <div class="row2">
+      <div class="field">
+        <label for="city">Ciudad</label>
+        <input id="city" type="text" name="city" value="<%= v.city || '' %>" autocomplete="address-level2" maxlength="60" required <%- bad('city') %> />
+        <%- err('city') %>
+      </div>
+      <div class="field">
+        <label for="postal_code">Código postal</label>
+        <input id="postal_code" type="text" name="postal_code" value="<%= v.postal_code || '' %>" autocomplete="postal-code" maxlength="10" required <%- bad('postal_code') %> />
+        <%- err('postal_code') %>
+      </div>
+    </div>
+    <div class="field">
+      <label for="country">País</label>
+      <select id="country" name="country" <%- bad('country') %>>
+        <% countries.forEach((c) => { %><option value="<%= c.code %>"<%= v.country === c.code ? ' selected' : '' %>><%= c.name %></option><% }) %>
+      </select>
+      <%- err('country') %>
+    </div>
+
+    <div class="field">
+      <label class="check" for="accept" style="color:var(--muted)">
+        <input id="accept" type="checkbox" name="accept" value="1" <%- bad('accept') %> />
+        <span>He leido y acepto las <a href="/legal/condiciones" target="_blank" rel="noopener">condiciones de compra</a> y la <a href="/legal/privacidad" target="_blank" rel="noopener">política de privacidad</a>.</span>
+      </label>
+      <%- err('accept') %>
+    </div>
+
+    <button class="btn block" type="submit"><%= stripeConfigured ? 'Continuar al pago con tarjeta' : 'Confirmar pedido' %></button>
   </form>
 
-  <div>
-    <h3>Resumen</h3>
-    <table class="simple">
-      <% items.forEach(i => { %>
-        <tr>
-          <td><%= i.title %> x<%= i.quantity %></td>
-          <td><%= ((i.price_cents * i.quantity) / 100).toFixed(2) %> &euro;</td>
-        </tr>
-      <% }) %>
-      <tr>
-        <td>Envio</td>
-        <td><%= (shipping / 100).toFixed(2) %> &euro;</td>
-      </tr>
-    </table>
-    <div class="totals">
-      <span class="grand"><%= (total / 100).toFixed(2) %> &euro;</span>
-    </div>
-  </div>
+  <aside class="panel sticky" aria-label="Resumen del pedido">
+    <h2>Tu pedido</h2>
+    <% cart.items.forEach((i) => { %>
+      <div class="mini-line"><span><%= i.title %> &times; <%= i.quantity %></span><span><%= euro(i.subtotal) %></span></div>
+    <% }) %>
+    <div class="summary-row"><span>Envío</span><span><%= cart.shipping ? euro(cart.shipping) : 'Gratis' %></span></div>
+    <div class="summary-row total"><span>Total</span><span><%= euro(cart.total) %></span></div>
+    <p style="margin:14px 0 0"><a class="link" href="/carrito">Editar carrito</a></p>
+  </aside>
 </div>
 
 <%- include('partials/footer') %>

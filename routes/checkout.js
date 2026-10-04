@@ -1,5 +1,8 @@
 const express = require('express');
 const db = require('../db');
+const { wrap, createLimiter } = require('../lib/security');
+const { loadCart, createOrder, setStatus, StockError } = require('../lib/orders');
+const { validateCheckout, allowedCountries, COUNTRY_NAMES } = require('../lib/validate');
 
 const router = express.Router();
 
@@ -7,153 +10,155 @@ const stripeConfigured = !!(
   process.env.STRIPE_SECRET_KEY && process.env.STRIPE_SECRET_KEY.startsWith('sk_')
 );
 const stripe = stripeConfigured ? require('stripe')(process.env.STRIPE_SECRET_KEY) : null;
-const SHIPPING_COST_CENTS = parseInt(process.env.SHIPPING_COST_CENTS || '350', 10);
 
-async function decrementStock(orderId) {
-  const items = await db.all('SELECT * FROM order_items WHERE order_id = ?', [orderId]);
-  for (const item of items) {
-    if (item.product_id) {
-      await db.run('UPDATE products SET stock = MAX(stock - ?, 0) WHERE id = ?', [
-        item.quantity,
-        item.product_id,
-      ]);
-    }
-  }
+const orderLimiter = createLimiter({ windowMs: 60 * 60 * 1000, max: 20 });
+const TOKEN_RE = /^[a-f0-9]{32}$/;
+
+function baseUrl(req) {
+  return (process.env.SITE_URL || `${req.protocol}://${req.get('host')}`).replace(/\/+$/, '');
 }
 
-async function getCartItems(req) {
-  const cart = req.session.cart || {};
-  const ids = Object.keys(cart);
-  if (ids.length === 0) return [];
-
-  const placeholders = ids.map(() => '?').join(',');
-  const products = await db.all(
-    `SELECT * FROM products WHERE id IN (${placeholders}) AND active = 1`,
-    ids
-  );
-
-  return products.map((p) => ({ ...p, quantity: cart[String(p.id)] }));
-}
-
-router.get('/checkout', async (req, res) => {
-  const items = await getCartItems(req);
-  if (items.length === 0) return res.redirect('/carrito');
-
-  const subtotal = items.reduce((sum, i) => sum + i.price_cents * i.quantity, 0);
-  const total = subtotal + SHIPPING_COST_CENTS;
-
-  res.render('checkout', {
-    items,
-    subtotal,
-    shipping: SHIPPING_COST_CENTS,
-    total,
+function renderCheckout(res, cart, values, errors, status = 200) {
+  const countries = allowedCountries();
+  res.status(status).render('checkout', {
+    cart,
+    values: { country: countries[0], ...values },
+    errors,
+    countries: countries.map((code) => ({ code, name: COUNTRY_NAMES[code] })),
     stripeConfigured,
+    meta: { title: 'Datos de envío', noindex: true },
   });
-});
+}
 
-router.post('/checkout/crear', async (req, res) => {
-  const items = await getCartItems(req);
-  if (items.length === 0) return res.redirect('/carrito');
+router.get(
+  '/checkout',
+  wrap(async (req, res) => {
+    const cart = await loadCart(req);
+    if (!cart.items.length) return res.redirect('/carrito');
+    renderCheckout(res, cart, {}, {});
+  })
+);
 
-  const { name, email, address, city, postal_code, country } = req.body;
-  if (!name || !email || !address || !city || !postal_code) {
-    return res.status(400).send('Faltan datos de envio.');
-  }
+router.post(
+  '/checkout/crear',
+  orderLimiter.middleware('Has hecho demasiados pedidos seguidos. Espera un poco e inténtalo de nuevo.'),
+  wrap(async (req, res) => {
+    const cart = await loadCart(req);
+    if (!cart.items.length) return res.redirect('/carrito');
 
-  const subtotal = items.reduce((sum, i) => sum + i.price_cents * i.quantity, 0);
-  const total = subtotal + SHIPPING_COST_CENTS;
+    const { values, errors, ok } = validateCheckout(req.body);
+    if (!ok) return renderCheckout(res, cart, values, errors, 400);
 
-  const shippingInfo = { name, email, address, city, postal_code, country: country || 'ES' };
-
-  const orderResult = await db.run(
-    `INSERT INTO orders (customer_email, customer_name, shipping_address, total_cents, status)
-     VALUES (?, ?, ?, ?, 'pending')`,
-    [email, name, JSON.stringify(shippingInfo), total]
-  );
-  const orderId = orderResult.lastInsertRowid;
-
-  for (const item of items) {
-    await db.run(
-      `INSERT INTO order_items (order_id, product_id, title, price_cents, quantity)
-       VALUES (?, ?, ?, ?, ?)`,
-      [orderId, item.id, item.title, item.price_cents, item.quantity]
-    );
-  }
-
-  if (stripeConfigured) {
+    let order;
     try {
-      const line_items = items.map((item) => ({
-        price_data: {
-          currency: 'eur',
-          product_data: { name: item.title },
-          unit_amount: item.price_cents,
-        },
-        quantity: item.quantity,
-      }));
-      line_items.push({
-        price_data: {
-          currency: 'eur',
-          product_data: { name: 'Envio' },
-          unit_amount: SHIPPING_COST_CENTS,
-        },
-        quantity: 1,
-      });
-
-      const session = await stripe.checkout.sessions.create({
-        mode: 'payment',
-        payment_method_types: ['card'],
-        customer_email: email,
-        line_items,
-        success_url: `${req.protocol}://${req.get('host')}/checkout/exito?order_id=${orderId}&session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${req.protocol}://${req.get('host')}/checkout/cancelado?order_id=${orderId}`,
-        metadata: { order_id: String(orderId) },
-      });
-
-      await db.run('UPDATE orders SET stripe_session_id = ? WHERE id = ?', [session.id, orderId]);
-      return res.redirect(303, session.url);
+      order = await createOrder({ cart: req.session.cart, customer: values });
     } catch (err) {
-      console.error('Error creando sesion de Stripe:', err);
-      return res.status(500).send('Error al conectar con Stripe. Revisa tu STRIPE_SECRET_KEY.');
-    }
-  }
-
-  // Sin Stripe: pago manual por transferencia/Bizum. El pedido queda "pending"
-  // hasta que confirmes el ingreso a mano desde el panel de admin.
-  req.session.cart = {};
-  return res.redirect(`/checkout/exito?order_id=${orderId}`);
-});
-
-router.get('/checkout/exito', async (req, res) => {
-  const { order_id, session_id } = req.query;
-  const order = await db.get('SELECT * FROM orders WHERE id = ?', [order_id]);
-  if (!order) return res.status(404).render('404');
-
-  if (stripeConfigured && session_id && order.status !== 'paid') {
-    try {
-      const session = await stripe.checkout.sessions.retrieve(session_id);
-      if (session.payment_status === 'paid') {
-        await db.run("UPDATE orders SET status = 'paid' WHERE id = ?", [order.id]);
-        await decrementStock(order.id);
-        req.session.cart = {};
-        order.status = 'paid';
+      if (err instanceof StockError) {
+        req.session.flash = { type: 'error', msg: err.message };
+        return res.redirect('/carrito');
       }
-    } catch (err) {
-      console.error('Error verificando sesion de Stripe:', err);
+      throw err;
     }
-  }
 
-  const items = await db.all('SELECT * FROM order_items WHERE order_id = ?', [order.id]);
-  res.render('checkout-success', {
-    order,
-    items,
-    stripeConfigured,
-    bankIban: process.env.BANK_IBAN || '',
-    bizumPhone: process.env.BIZUM_PHONE || '',
-  });
-});
+    if (stripeConfigured) {
+      try {
+        const line_items = order.lines.map((l) => ({
+          price_data: { currency: 'eur', product_data: { name: l.title }, unit_amount: l.price_cents },
+          quantity: l.quantity,
+        }));
+        if (order.shipping > 0) {
+          line_items.push({
+            price_data: { currency: 'eur', product_data: { name: 'Envío' }, unit_amount: order.shipping },
+            quantity: 1,
+          });
+        }
+        const session = await stripe.checkout.sessions.create({
+          mode: 'payment',
+          payment_method_types: ['card'],
+          customer_email: values.email,
+          line_items,
+          success_url: `${baseUrl(req)}/pedido/${order.token}?session_id={CHECKOUT_SESSION_ID}`,
+          cancel_url: `${baseUrl(req)}/checkout/cancelado?token=${order.token}`,
+          metadata: { order_id: String(order.id) },
+        });
+        await db.run('UPDATE orders SET stripe_session_id = ? WHERE id = ?', [session.id, order.id]);
+        return res.redirect(303, session.url);
+      } catch (err) {
+        console.error('Error creando sesión de Stripe:', err.message);
+        await setStatus(order.id, 'cancelled'); // libera el stock reservado
+        req.session.flash = { type: 'error', msg: 'No se ha podido iniciar el pago con tarjeta. Inténtalo de nuevo.' };
+        return res.redirect('/carrito');
+      }
+    }
 
-router.get('/checkout/cancelado', (req, res) => {
-  res.render('checkout-cancel');
-});
+    // Pago manual (Bizum / transferencia): el pedido queda pendiente hasta que se confirme.
+    req.session.cart = {};
+    res.redirect(`/pedido/${order.token}`);
+  })
+);
+
+router.get(
+  '/pedido/:token',
+  wrap(async (req, res) => {
+    if (!TOKEN_RE.test(req.params.token)) return res.status(404).render('error', { status: 404 });
+    let order = await db.get('SELECT * FROM orders WHERE token = ?', [req.params.token]);
+    if (!order) return res.status(404).render('error', { status: 404 });
+
+    // Verificación del pago con Stripe: la sesión debe ser la de este pedido y el
+    // importe cobrado debe coincidir exactamente.
+    const sessionId = typeof req.query.session_id === 'string' ? req.query.session_id : '';
+    if (stripeConfigured && sessionId && order.status === 'pending' && order.stripe_session_id) {
+      try {
+        const s = await stripe.checkout.sessions.retrieve(sessionId);
+        if (
+          s.id === order.stripe_session_id &&
+          s.payment_status === 'paid' &&
+          s.metadata && String(s.metadata.order_id) === String(order.id) &&
+          s.amount_total === Number(order.total_cents)
+        ) {
+          await setStatus(order.id, 'paid');
+          req.session.cart = {};
+          order = await db.get('SELECT * FROM orders WHERE id = ?', [order.id]);
+        }
+      } catch (err) {
+        console.error('Error verificando sesión de Stripe:', err.message);
+      }
+    }
+
+    const items = await db.all('SELECT * FROM order_items WHERE order_id = ?', [order.id]);
+    let shipTo = {};
+    try {
+      shipTo = JSON.parse(order.shipping_address || '{}');
+    } catch (_) {
+      /* sin datos */
+    }
+
+    res.set('Cache-Control', 'no-store');
+    res.render('order', {
+      order,
+      items,
+      shipTo,
+      stripeConfigured,
+      bankIban: process.env.BANK_IBAN || '',
+      bizumPhone: process.env.BIZUM_PHONE || '',
+      meta: { title: `Pedido #${order.id}`, noindex: true },
+    });
+  })
+);
+
+router.get(
+  '/checkout/cancelado',
+  wrap(async (req, res) => {
+    const token = typeof req.query.token === 'string' ? req.query.token : '';
+    if (TOKEN_RE.test(token)) {
+      const order = await db.get('SELECT * FROM orders WHERE token = ?', [token]);
+      if (order && order.status === 'pending' && order.stripe_session_id) {
+        await setStatus(order.id, 'cancelled');
+      }
+    }
+    req.session.flash = { type: 'info', msg: 'Pago cancelado. No se ha realizado ningún cargo y tu carrito sigue disponible.' };
+    res.redirect('/carrito');
+  })
+);
 
 module.exports = router;

@@ -1,56 +1,60 @@
-<% pageTitle = 'Carrito' %>
 <%- include('partials/header') %>
 
 <h1>Tu carrito</h1>
 
-<% if (items.length === 0) { %>
+<% if (!cart.items.length) { %>
   <div class="empty-state">
-    <p>Tu carrito esta vacio.</p>
+    <h2>Tu carrito está vacío</h2>
+    <p>Echa un vistazo al catálogo y encuentra algo que te guste.</p>
     <a class="btn" href="/">Ver la tienda</a>
   </div>
 <% } else { %>
-  <table class="simple">
-    <thead>
-      <tr>
-        <th></th>
-        <th>Producto</th>
-        <th>Precio</th>
-        <th>Cantidad</th>
-        <th>Subtotal</th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody>
-      <% items.forEach(i => { %>
-        <tr>
-          <td>
-            <% if (i.image_path) { %><img class="thumb-sm" src="<%= i.image_path %>" alt="" /><% } %>
-          </td>
-          <td><%= i.title %></td>
-          <td><%= (i.price_cents / 100).toFixed(2) %> &euro;</td>
-          <td>
-            <form method="POST" action="/actualizar/<%= i.id %>">
-              <input class="qty-input" type="number" name="quantity" min="0" value="<%= i.quantity %>" onchange="this.form.submit()" />
-            </form>
-          </td>
-          <td><%= (i.subtotal / 100).toFixed(2) %> &euro;</td>
-          <td>
-            <form method="POST" action="/quitar/<%= i.id %>">
-              <button class="btn small danger" type="submit">Quitar</button>
-            </form>
-          </td>
-        </tr>
+  <div class="layout-2">
+    <section class="panel" aria-label="Artículos">
+      <% cart.items.forEach((i) => { const max = Math.min(i.stock, 10); %>
+        <div class="cart-line">
+          <a href="/producto/<%= i.id %>">
+            <% if (i.image_path) { %><img src="<%= thumb(i.image_path, 200) %>" alt="<%= i.title %>" width="84" height="84" /><% } %>
+          </a>
+          <div>
+            <h3><a href="/producto/<%= i.id %>"><%= i.title %></a></h3>
+            <small><%= euro(i.price_cents) %> &middot; <%= TYPE_LABELS[i.type] || i.type %></small>
+            <div class="controls">
+              <form method="POST" action="/actualizar/<%= i.id %>">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+                <label class="sr-only" for="qty-<%= i.id %>">Cantidad de <%= i.title %></label>
+                <select id="qty-<%= i.id %>" name="quantity" data-autosubmit>
+                  <% for (let n = 1; n <= max; n++) { %><option value="<%= n %>"<%= n === i.quantity ? ' selected' : '' %>><%= n %></option><% } %>
+                </select>
+                <noscript><button class="btn small secondary" type="submit">Actualizar</button></noscript>
+              </form>
+              <form method="POST" action="/quitar/<%= i.id %>">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+                <button class="btn small danger" type="submit">Quitar</button>
+              </form>
+            </div>
+          </div>
+          <div class="line-total"><%= euro(i.subtotal) %></div>
+        </div>
       <% }) %>
-    </tbody>
-  </table>
+    </section>
 
-  <div class="totals">
-    <div>Total: <span class="grand"><%= (total / 100).toFixed(2) %> &euro;</span></div>
-    <p style="color: var(--text-dim); font-size: 0.85rem;">El envio se calcula en el siguiente paso.</p>
-  </div>
-
-  <div style="text-align:right; margin-top: 16px;">
-    <a class="btn" href="/checkout">Ir a pagar</a>
+    <aside class="panel sticky" aria-label="Resumen">
+      <h2>Resumen</h2>
+      <% if (shop.freeFrom) { %>
+        <% if (cart.freeShippingLeft > 0) { %>
+          <small>Te faltan <b><%= euro(cart.freeShippingLeft) %></b> para el envío gratis</small>
+          <div class="progress" role="presentation"><span style="width:<%= Math.min(100, Math.round(cart.subtotal / shop.freeFrom * 100)) %>%"></span></div>
+        <% } else { %>
+          <p class="flash success" style="margin:0 0 14px">Tienes envío gratis.</p>
+        <% } %>
+      <% } %>
+      <div class="summary-row"><span>Subtotal</span><span><%= euro(cart.subtotal) %></span></div>
+      <div class="summary-row"><span>Envío</span><span><%= cart.shipping ? euro(cart.shipping) : 'Gratis' %></span></div>
+      <div class="summary-row total"><span>Total</span><span><%= euro(cart.total) %></span></div>
+      <a class="btn block" style="margin-top:18px" href="/checkout">Continuar con el pedido</a>
+      <p style="margin:14px 0 0;text-align:center"><a class="link" href="/">Seguir comprando</a></p>
+    </aside>
   </div>
 <% } %>
 

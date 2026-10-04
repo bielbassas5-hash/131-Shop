@@ -1,18 +1,16 @@
-<% pageTitle = 'Admin' %>
 <%- include('../partials/header') %>
 
-<h1>Acceso admin</h1>
-
-<% if (error) { %>
-  <div class="alert error"><%= error %></div>
-<% } %>
-
-<form class="stack" method="POST" action="/admin/login">
-  <div>
-    <label>Contrasena</label>
-    <input type="password" name="password" required autofocus />
-  </div>
-  <button class="btn block" type="submit">Entrar</button>
-</form>
+<div class="panel form-card" style="margin:40px auto">
+  <h1>Acceso admin</h1>
+  <% if (error) { %><div class="flash error" role="alert"><div class="flash-body"><%= error %></div></div><% } %>
+  <form method="POST" action="/admin/login">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+    <div class="field">
+      <label for="password">Contraseña</label>
+      <input id="password" type="password" name="password" autocomplete="current-password" required autofocus />
+    </div>
+    <button class="btn block" type="submit">Entrar</button>
+  </form>
+</div>
 
 <%- include('../partials/footer') %>

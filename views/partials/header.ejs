@@ -1,23 +1,47 @@
-<!doctype html>
+<%
+  const m = (typeof meta !== 'undefined' && meta) || {};
+  const pageTitle = m.title ? m.title + ' · ' + artistName : artistName + ' · Arte y stickers hechos a mano';
+  const pageDesc = m.description || 'Dibujos originales, prints y stickers hechos a mano por 131. Ediciones limitadas con envío a domicilio.';
+  const ogImg = m.image ? thumb(m.image, 1000) : '';
+  const ogAbs = ogImg ? (/^https?:/.test(ogImg) ? ogImg : shop.siteUrl + ogImg) : '';
+%><!doctype html>
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title><%= typeof pageTitle !== 'undefined' ? pageTitle + ' · ' + artistName : artistName %></title>
-  <link rel="stylesheet" href="/css/style.css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title><%= pageTitle %></title>
+  <meta name="description" content="<%= pageDesc %>" />
+  <meta name="theme-color" content="#0b0b0d" />
+  <% if (m.noindex) { %><meta name="robots" content="noindex, nofollow" />
+  <% } else { %><link rel="canonical" href="<%= shop.siteUrl + currentPath %>" /><% } %>
+  <meta property="og:site_name" content="<%= artistName %>" />
+  <meta property="og:title" content="<%= pageTitle %>" />
+  <meta property="og:description" content="<%= pageDesc %>" />
+  <meta property="og:type" content="<%= m.type || 'website' %>" />
+  <% if (ogAbs) { %><meta property="og:image" content="<%= ogAbs %>" />
+  <meta name="twitter:card" content="summary_large_image" /><% } %>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap" />
+  <link rel="stylesheet" href="/css/style.css?v=<%= assetVersion %>" />
+  <script src="/js/app.js?v=<%= assetVersion %>" defer></script>
 </head>
 <body>
-  <header class="site">
+  <a class="skip-link" href="#contenido">Saltar al contenido</a>
+  <header class="site-header">
     <div class="wrap">
-      <a href="/" class="logo"><%= artistName %><span>.</span></a>
-      <nav class="main">
-        <a href="/">Tienda</a>
-        <a href="/carrito" class="cart-link">
+      <a href="/" class="logo" aria-label="<%= artistName %> - inicio"><%= artistName %><i>.</i></a>
+      <nav class="nav" aria-label="Principal">
+        <a href="/" <%- currentPath === '/' ? 'aria-current="page"' : '' %>>Tienda</a>
+        <% if (isAdmin) { %><a href="/admin" class="admin-pill">Panel</a><% } %>
+        <a href="/carrito" class="cart-link" aria-label="Carrito, <%= cartCount %> artículos">
           Carrito
           <% if (cartCount > 0) { %><span class="cart-badge"><%= cartCount %></span><% } %>
         </a>
       </nav>
     </div>
   </header>
-  <main>
+  <main id="contenido">
     <div class="wrap">
+      <%- include('flash') %>

@@ -1,0 +1,17 @@
+<% const soldOut = p.stock <= 0; const low = !soldOut && p.stock <= 2; %>
+<a class="card<%= soldOut ? ' soldout' : '' %>" href="/producto/<%= p.id %>">
+  <div class="card-media">
+    <% if (p.image_path) { %>
+      <img src="<%= thumb(p.image_path, 600) %>" alt="<%= p.title %>" loading="lazy" decoding="async" width="600" height="600" />
+    <% } else { %>
+      <span class="noimg">Sin imagen</span>
+    <% } %>
+    <% if (soldOut) { %><span class="badge-corner">Agotado</span>
+    <% } else if (low) { %><span class="badge-corner warn">Últimas unidades</span><% } %>
+  </div>
+  <div class="card-body">
+    <span class="tag"><%= TYPE_LABELS[p.type] || p.type %></span>
+    <h3><%= p.title %></h3>
+    <div class="card-foot"><span class="price"><%= euro(p.price_cents) %></span></div>
+  </div>
+</a>

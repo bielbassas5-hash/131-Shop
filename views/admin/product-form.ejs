@@ -1,46 +1,64 @@
-<% pageTitle = product ? 'Editar producto' : 'Nuevo producto' %>
 <%- include('../partials/header') %>
+<%
+  const f = form || (product ? {
+    title: product.title,
+    description: product.description || '',
+    price: (product.price_cents / 100).toFixed(2),
+    stock: String(product.stock),
+    type: product.type,
+    active: !!product.active
+  } : { title: '', description: '', price: '', stock: '1', type: 'sticker', active: true });
+  const e = errors || {};
+  const err = (k) => e[k] ? '<p class="field-error">' + e[k] + '</p>' : '';
+  const action = product ? '/admin/productos/' + product.id + '/editar' : '/admin/productos/nuevo';
+%>
 
-<h1><%= product ? 'Editar producto' : 'Nuevo producto' %></h1>
+<div class="admin-top">
+  <h1><%= product ? 'Editar producto' : 'Nuevo producto' %></h1>
+  <a class="btn ghost" href="/admin">Volver</a>
+</div>
 
-<% if (error) { %>
-  <div class="alert error"><%= error %></div>
-<% } %>
+<% if (error) { %><div class="flash error" role="alert"><div class="flash-body"><%= error %></div></div><% } %>
 
-<form class="stack" method="POST" action="<%= product ? '/admin/productos/' + product.id + '/editar' : '/admin/productos/nuevo' %>" enctype="multipart/form-data">
-  <div>
-    <label>Titulo</label>
-    <input type="text" name="title" value="<%= product ? product.title : '' %>" required />
+<form class="panel form-card" method="POST" action="<%= action %>?_csrf=<%= csrfToken %>" enctype="multipart/form-data" data-once>
+  <div class="field">
+    <label for="title">Título</label>
+    <input id="title" type="text" name="title" value="<%= f.title %>" maxlength="80" required />
+    <%- err('title') %>
   </div>
-  <div>
-    <label>Descripcion</label>
-    <textarea name="description"><%= product ? product.description : '' %></textarea>
+  <div class="field">
+    <label for="description">Descripción</label>
+    <textarea id="description" name="description" maxlength="1500"><%= f.description %></textarea>
+    <p class="field-hint">Cuenta la historia de la pieza, medidas, materiales, técnica...</p>
   </div>
   <div class="row2">
-    <div>
-      <label>Precio (EUR)</label>
-      <input type="number" step="0.01" min="0" name="price" value="<%= product ? (product.price_cents / 100).toFixed(2) : '' %>" required />
+    <div class="field">
+      <label for="price">Precio (EUR)</label>
+      <input id="price" type="text" inputmode="decimal" name="price" value="<%= f.price %>" placeholder="4,50" required />
+      <%- err('price') %>
     </div>
-    <div>
-      <label>Stock (unidades disponibles)</label>
-      <input type="number" min="0" name="stock" value="<%= product ? product.stock : 1 %>" required />
+    <div class="field">
+      <label for="stock">Unidades disponibles</label>
+      <input id="stock" type="number" min="0" max="9999" name="stock" value="<%= f.stock %>" required />
+      <%- err('stock') %>
     </div>
   </div>
-  <div>
-    <label>Tipo</label>
-    <select name="type">
-      <option value="dibujo" <%= product && product.type === 'dibujo' ? 'selected' : '' %>>Dibujo original</option>
-      <option value="print" <%= product && product.type === 'print' ? 'selected' : '' %>>Print / lamina</option>
-      <option value="sticker" <%= !product || product.type === 'sticker' ? 'selected' : '' %>>Sticker</option>
+  <div class="field">
+    <label for="type">Tipo</label>
+    <select id="type" name="type">
+      <% Object.keys(TYPE_LABELS).forEach((t) => { %><option value="<%= t %>"<%= f.type === t ? ' selected' : '' %>><%= TYPE_LABELS[t] %></option><% }) %>
     </select>
   </div>
-  <div>
-    <label>Imagen <%= product ? '(deja vacio para mantener la actual)' : '' %></label>
-    <input type="file" name="image" accept="image/*" <%= product ? '' : 'required' %> />
+  <div class="field">
+    <label for="image">Imagen <%= product ? '(deja vacío para mantener la actual)' : '' %></label>
+    <% if (product && product.image_path) { %><img class="preview" src="<%= thumb(product.image_path, 300) %>" alt="Imagen actual" /><% } %>
+    <img id="image-preview" class="preview" alt="Vista previa" hidden />
+    <input id="image" type="file" name="image" accept="image/png,image/jpeg,image/webp,image/gif" data-preview <%= product ? '' : 'required' %> />
+    <p class="field-hint">PNG, JPG, WEBP o GIF. Máximo 8 MB. Mejor cuadrada (por ejemplo 1500 x 1500 px).</p>
   </div>
   <% if (product) { %>
-    <div>
-      <label><input type="checkbox" name="active" value="1" <%= product.active ? 'checked' : '' %> style="width:auto; display:inline-block; margin-right:8px;" />Visible en la tienda</label>
+    <div class="field">
+      <label class="check" for="active"><input id="active" type="checkbox" name="active" value="1"<%= f.active ? ' checked' : '' %> /><span>Visible en la tienda</span></label>
     </div>
   <% } %>
   <button class="btn block" type="submit"><%= product ? 'Guardar cambios' : 'Publicar producto' %></button>

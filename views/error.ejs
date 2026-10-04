@@ -1,0 +1,16 @@
+<%- include('partials/header') %>
+<%
+  const code = typeof status !== 'undefined' ? status : 500;
+  const heading = typeof title !== 'undefined' ? title : ({ 404: 'No encontrado', 500: 'Algo ha salido mal', 403: 'Acceso denegado', 429: 'Demasiadas peticiones' }[code] || 'Error');
+  const text = typeof message !== 'undefined' ? message : ({
+    404: 'No hemos encontrado lo que buscabas. Puede que la página ya no exista.',
+    500: 'Ha ocurrido un error inesperado. Inténtalo de nuevo en unos instantes.'
+  }[code] || 'No se ha podido completar la petición.');
+%>
+<div class="error-page">
+  <div class="code"><%= code %></div>
+  <h1><%= heading %></h1>
+  <p class="muted"><%= text %></p>
+  <a class="btn" href="/">Volver a la tienda</a>
+</div>
+<%- include('partials/footer') %>

@@ -1,34 +1,71 @@
-<% pageTitle = 'Tienda' %>
 <%- include('partials/header') %>
+<%
+  const link = (o) => {
+    const merged = Object.assign({}, filters, o);
+    const params = new URLSearchParams();
+    Object.keys(merged).forEach((k) => { if (merged[k] && !(k === 'orden' && merged[k] === 'nuevo')) params.set(k, merged[k]); });
+    const s = params.toString();
+    return '/' + (s ? '?' + s : '') + '#catalogo';
+  };
+  const filtered = filters.tipo || filters.q;
+%>
 
-<div class="hero">
-  <h1>Arte original y stickers</h1>
-  <p>Piezas hechas a mano por <%= artistName %>. Ediciones limitadas, envio a domicilio.</p>
-</div>
-
-<% if (products.length === 0) { %>
-  <div class="empty-state">
-    <p>Todavia no hay productos publicados.</p>
+<% if (!filtered) { %>
+<section class="hero">
+  <p class="eyebrow">Arte hecho a mano</p>
+  <h1>Dibujos, prints y <em>stickers</em> con alma.</h1>
+  <p class="lead">Piezas originales de <%= artistName %> en ediciones limitadas. Cada una se prepara a mano y llega a tu casa.</p>
+  <div class="actions">
+    <a class="btn" href="#catalogo">Ver catálogo</a>
+    <a class="btn ghost" href="/legal/condiciones">Envíos y devoluciones</a>
   </div>
-<% } else { %>
-  <div class="grid">
-    <% products.forEach(p => { %>
-      <a class="card" href="/producto/<%= p.id %>">
-        <div class="thumb">
-          <% if (p.image_path) { %>
-            <img src="<%= p.image_path %>" alt="<%= p.title %>" />
-          <% } else { %>
-            Sin imagen
-          <% } %>
-        </div>
-        <div class="body">
-          <span class="type-tag"><%= p.type %></span>
-          <h3><%= p.title %></h3>
-          <span class="price"><%= (p.price_cents / 100).toFixed(2) %> &euro;</span>
-        </div>
-      </a>
-    <% }) %>
-  </div>
+  <ul class="perks">
+    <li>Ediciones limitadas</li>
+    <li>Envío desde <%= euro(shop.shippingCents) %><% if (shop.freeFrom) { %> &middot; gratis desde <%= euro(shop.freeFrom) %><% } %></li>
+    <li>Hecho a mano</li>
+  </ul>
+</section>
 <% } %>
+
+<section id="catálogo" aria-labelledby="catalogo-titulo">
+  <div class="toolbar">
+    <div class="chips" role="group" aria-label="Filtrar por tipo">
+      <a class="chip<%= !filters.tipo ? ' active' : '' %>" href="<%= link({ tipo: '' }) %>">Todo</a>
+      <% ['dibujo', 'print', 'sticker'].forEach((t) => { %>
+        <a class="chip<%= filters.tipo === t ? ' active' : '' %>" href="<%= link({ tipo: t }) %>"><%= TYPE_PLURALS[t] %></a>
+      <% }) %>
+    </div>
+    <form class="filters" method="GET" action="/#catalogo" role="search">
+      <% if (filters.tipo) { %><input type="hidden" name="tipo" value="<%= filters.tipo %>" /><% } %>
+      <label class="sr-only" for="q">Buscar</label>
+      <input id="q" type="search" name="q" value="<%= filters.q %>" placeholder="Buscar..." maxlength="40" style="width:190px" />
+      <label class="sr-only" for="orden">Ordenar</label>
+      <select id="orden" name="orden" data-autosubmit style="width:auto">
+        <option value="nuevo"<%= filters.orden === 'nuevo' ? ' selected' : '' %>>Novedades</option>
+        <option value="precio_asc"<%= filters.orden === 'precio_asc' ? ' selected' : '' %>>Precio: menor a mayor</option>
+        <option value="precio_desc"<%= filters.orden === 'precio_desc' ? ' selected' : '' %>>Precio: mayor a menor</option>
+      </select>
+      <button class="btn secondary small" type="submit">Buscar</button>
+    </form>
+  </div>
+  <h2 id="catalogo-titulo" class="sr-only">Catálogo</h2>
+
+  <% if (products.length === 0) { %>
+    <div class="empty-state">
+      <% if (filtered) { %>
+        <h2>Sin resultados</h2>
+        <p>No hemos encontrado nada con esos filtros.</p>
+        <a class="btn secondary" href="/">Quitar filtros</a>
+      <% } else { %>
+        <h2>Muy pronto</h2>
+        <p>Estamos preparando las primeras piezas. Vuelve en unos días.</p>
+      <% } %>
+    </div>
+  <% } else { %>
+    <div class="grid">
+      <% products.forEach((p) => { %><%- include('partials/product-card', { p }) %><% }) %>
+    </div>
+  <% } %>
+</section>
 
 <%- include('partials/footer') %>

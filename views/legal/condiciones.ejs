@@ -1,0 +1,33 @@
+<%- include('../partials/header') %>
+<%
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const mail = shop.contactEmail ? esc(shop.contactEmail) : '<span class="todo">[email pendiente]</span>';
+%>
+<article class="prose">
+  <h1>Condiciones de compra, envíos y devoluciones</h1>
+
+  <h2>Productos y precios</h2>
+  <p>Todas las piezas son hechas a mano y se venden en ediciones limitadas o como unidades únicas. Los precios se muestran en euros. Pueden existir ligeras diferencias de color entre la pantalla y la obra física.</p>
+
+  <h2>Como comprar y pagar</h2>
+  <p>Anade los artículos al carrito, indica tus datos de envío y confirma el pedido. Al confirmar, las unidades quedan reservadas para ti. El pago se realiza por los medios indicados al finalizar el pedido (Bizum, transferencia bancaria o tarjeta, segun disponibilidad). El pedido se prepara una vez confirmado el pago; si no se recibe en un plazo razonable de pocos días, el pedido se cancela y las unidades vuelven a estar disponibles.</p>
+
+  <h2>Envíos</h2>
+  <ul>
+    <li>Coste de envío: <%= euro(shop.shippingCents) %> por pedido<% if (shop.freeFrom) { %>, gratis a partir de <%= euro(shop.freeFrom) %><% } %>.</li>
+    <li>Los pedidos se envian por correo postal o mensajería, normalmente en pocos días laborables tras confirmar el pago. Los plazos de entrega dependen del transportista.</li>
+    <li>Te avisaremos por email cuando salga tu pedido, con el número de seguimiento si lo hay.</li>
+    <li>Las obras se embalan con protección para evitar danos durante el transporte.</li>
+  </ul>
+
+  <h2>Derecho de desistimiento (14 días)</h2>
+  <p>Como consumidor, tienes derecho a desistir de la compra, sin necesidad de justificación, en un plazo de 14 días naturales desde que recibes el pedido. Para ejercerlo, escribe a <%- mail %> indicando tu número de pedido. Debes devolver los artículos en un plazo máximo de 14 días desde que comunicas el desistimiento, en buen estado y bien protegidos. Los gastos directos de devolución corren a cargo del comprador. Te reembolsaremos el importe de los artículos (y el envío estandar de ida) en un plazo máximo de 14 días desde que recibamos la devolución, por el mismo medio de pago utilizado.</p>
+  <p>El desistimiento no aplica a artículos personalizados o realizados por encargo segun tus especificaciones.</p>
+
+  <h2>Productos danados o incorrectos</h2>
+  <p>Si tu pedido llega danado o no es el que pediste, escríbenos con una foto en un plazo de 48 horas desde la recepción y lo resolveremos reponiendo la pieza o reembolsando el importe. Ademas, conservas los derechos de garantía legal que la normativa de consumidores reconoce sobre los bienes.</p>
+
+  <h2>Contacto</h2>
+  <p>Para cualquier duda: <%- mail %>.</p>
+</article>
+<%- include('../partials/footer') %>

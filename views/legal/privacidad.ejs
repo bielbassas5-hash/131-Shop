@@ -1,0 +1,33 @@
+<%- include('../partials/header') %>
+<%
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const owner = shop.legalName ? esc(shop.legalName) : '<span class="todo">[titular pendiente de completar]</span>';
+  const mail = shop.contactEmail ? esc(shop.contactEmail) : '<span class="todo">[email pendiente]</span>';
+%>
+<article class="prose">
+  <h1>Política de privacidad</h1>
+  <p>Información sobre el tratamiento de tus datos personales conforme al Reglamento (UE) 2016/679 (RGPD) y la LOPDGDD.</p>
+
+  <h2>Responsable</h2>
+  <p><%- owner %> (<%= artistName %>). Contacto: <%- mail %>.</p>
+
+  <h2>Que datos tratamos y para que</h2>
+  <ul>
+    <li><b>Datos del pedido</b> (nombre, email, teléfono opcional, dirección de envío, artículos comprados): para gestionar tu compra, preparar y enviar el pedido y atender incidencias.</li>
+    <li><b>Datos tecnicos</b>: cookies imprescindibles para el carrito y la seguridad del sitio (ver apartado de cookies).</li>
+  </ul>
+  <p>La base legal es la ejecución del contrato de compraventa (art. 6.1.b RGPD) y el cumplimiento de obligaciones legales (art. 6.1.c), como las contables y fiscales.</p>
+
+  <h2>Destinatarios</h2>
+  <p>Solo comunicamos tus datos cuando es necesario para prestar el servicio: empresa de transporte o correos (para entregar el pedido), y proveedores tecnicos que alojan la web y los datos (servicios de hosting, base de datos y almacenamiento de imagenes), que actuan como encargados del tratamiento. No vendemos tus datos ni los usamos para publicidad. Algunos proveedores pueden estar fuera del Espacio Económico Europeo y aplican las garantias previstas en el RGPD.</p>
+
+  <h2>Conservación</h2>
+  <p>Conservamos los datos del pedido durante el tiempo necesario para cumplir las obligaciones legales (contables y fiscales) y atender posibles reclamaciones. Despues se eliminan o anonimizan.</p>
+
+  <h2>Tus derechos</h2>
+  <p>Puedes ejercer los derechos de acceso, rectificación, supresión, oposición, limitación y portabilidad escribiendo a <%- mail %>. Si consideras que no hemos tratado tus datos correctamente, puedes reclamar ante la Agencia Española de Protección de Datos (www.aepd.es).</p>
+
+  <h2>Cookies</h2>
+  <p>Esta web solo usa cookies técnicas imprescindibles: una para mantener tu carrito y sesión, y otra de seguridad contra falsificación de formularios. No usamos cookies de analítica ni de publicidad, por lo que no hace falta pedir tu consentimiento. Las tipografias se cargan desde Google Fonts.</p>
+</article>
+<%- include('../partials/footer') %>

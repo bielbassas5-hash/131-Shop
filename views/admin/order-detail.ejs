@@ -1,49 +1,57 @@
-<% pageTitle = 'Pedido #' + order.id %>
-<%
-  let shipping = {};
-  try { shipping = JSON.parse(order.shipping_address || '{}'); } catch (e) {}
-%>
 <%- include('../partials/header') %>
 
-<div class="admin-topbar">
-  <h1>Pedido #<%= order.id %></h1>
-  <a class="btn secondary" href="/admin/pedidos">Volver</a>
+<div class="admin-top">
+  <h1>Pedido #<%= order.id %> <span class="badge <%= order.status %>"><%= STATUS_LABELS[order.status] || order.status %></span></h1>
+  <a class="btn ghost" href="/admin/pedidos">Volver</a>
 </div>
 
-<p><span class="badge <%= order.status %>"><%= order.status %></span></p>
+<div class="layout-2">
+  <div>
+    <section class="panel" style="margin-bottom:24px">
+      <h2>Artículos</h2>
+      <% items.forEach((i) => { %>
+        <div class="mini-line"><span><%= i.title %> &times; <%= i.quantity %></span><span><%= euro(i.price_cents * i.quantity) %></span></div>
+      <% }) %>
+      <div class="summary-row"><span>Envío</span><span><%= euro(order.shipping_cents) %></span></div>
+      <div class="summary-row total"><span>Total</span><span><%= euro(order.total_cents) %></span></div>
+    </section>
 
-<h3>Articulos</h3>
-<table class="simple">
-  <% items.forEach(i => { %>
-    <tr>
-      <td><%= i.title %> x<%= i.quantity %></td>
-      <td><%= ((i.price_cents * i.quantity) / 100).toFixed(2) %> &euro;</td>
-    </tr>
-  <% }) %>
-</table>
-<div class="totals">
-  <span class="grand"><%= (order.total_cents / 100).toFixed(2) %> &euro;</span>
+    <section class="panel">
+      <h2>Envío</h2>
+      <dl class="kv">
+        <dt>Nombre</dt><dd><%= shipTo.name || order.customer_name %></dd>
+        <dt>Email</dt><dd><a class="link" href="mailto:<%= shipTo.email || order.customer_email %>"><%= shipTo.email || order.customer_email %></a></dd>
+        <dt>Teléfono</dt><dd><%= shipTo.phone || '-' %></dd>
+        <dt>Dirección</dt><dd><%= shipTo.address %></dd>
+        <dt>Ciudad</dt><dd><%= shipTo.postal_code %> <%= shipTo.city %></dd>
+        <dt>País</dt><dd><%= shipTo.country %></dd>
+        <dt>Recibido</dt><dd><%= order.created_at %></dd>
+      </dl>
+    </section>
+  </div>
+
+  <aside class="panel">
+    <h2>Gestionar</h2>
+    <form method="POST" action="/admin/pedidos/<%= order.id %>/estado">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+      <div class="field">
+        <label for="status">Estado</label>
+        <select id="status" name="status">
+          <% statuses.forEach((s) => { %><option value="<%= s %>"<%= order.status === s ? ' selected' : '' %>><%= STATUS_LABELS[s] %></option><% }) %>
+        </select>
+        <p class="field-hint">Al cancelar, las unidades vuelven al stock.</p>
+      </div>
+      <div class="field">
+        <label for="tracking">Número de seguimiento</label>
+        <input id="tracking" type="text" name="tracking" value="<%= order.tracking_number || '' %>" maxlength="40" />
+      </div>
+      <button class="btn block" type="submit">Guardar</button>
+    </form>
+    <hr />
+    <a class="btn secondary block" href="<%= mailto %>">Avisar al cliente por email</a>
+    <p class="field-hint">Abre tu correo con el mensaje y el enlace de seguimiento ya preparados.</p>
+    <p class="field-hint">Enlace del cliente: <a class="link" href="<%= publicLink %>" target="_blank" rel="noopener">ver pedido</a></p>
+  </aside>
 </div>
-
-<h3 style="margin-top:30px;">Envio</h3>
-<table class="simple">
-  <tr><th>Nombre</th><td><%= shipping.name || order.customer_name %></td></tr>
-  <tr><th>Email</th><td><%= shipping.email || order.customer_email %></td></tr>
-  <tr><th>Direccion</th><td><%= shipping.address %></td></tr>
-  <tr><th>Ciudad</th><td><%= shipping.city %></td></tr>
-  <tr><th>Codigo postal</th><td><%= shipping.postal_code %></td></tr>
-  <tr><th>Pais</th><td><%= shipping.country %></td></tr>
-</table>
-
-<h3 style="margin-top:30px;">Cambiar estado</h3>
-<form class="stack" method="POST" action="/admin/pedidos/<%= order.id %>/estado">
-  <select name="status">
-    <option value="pending" <%= order.status === 'pending' ? 'selected' : '' %>>Pendiente de pago</option>
-    <option value="paid" <%= order.status === 'paid' ? 'selected' : '' %>>Pagado</option>
-    <option value="shipped" <%= order.status === 'shipped' ? 'selected' : '' %>>Enviado</option>
-    <option value="cancelled" <%= order.status === 'cancelled' ? 'selected' : '' %>>Cancelado</option>
-  </select>
-  <button class="btn" type="submit">Actualizar estado</button>
-</form>
 
 <%- include('../partials/footer') %>

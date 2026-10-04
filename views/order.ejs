@@ -1,0 +1,72 @@
+<%- include('partials/header') %>
+<%
+  const st = order.status;
+  const cancelled = st === 'cancelled';
+  const paid = st === 'paid' || st === 'shipped';
+  const shipped = st === 'shipped';
+  const shippingCents = Number(order.shipping_cents) || 0;
+  const subtotal = items.reduce((s, i) => s + i.price_cents * i.quantity, 0);
+%>
+
+<h1>Pedido #<%= order.id %></h1>
+<p class="muted">Guarda esta página en favoritos: es el enlace para seguir el estado de tu pedido.</p>
+
+<% if (cancelled) { %>
+  <div class="flash error"><div class="flash-body">Este pedido está <b>cancelado</b>. Si crees que es un error, escríbenos<% if (shop.contactEmail) { %> a <a href="mailto:<%= shop.contactEmail %>"><%= shop.contactEmail %></a><% } %>.</div></div>
+<% } else { %>
+  <ol class="steps" style="list-style:none;padding:0" aria-label="Estado del pedido">
+    <li class="step done">Pedido recibido</li>
+    <li class="step <%= paid ? 'done' : 'current' %>">Pago confirmado</li>
+    <li class="step <%= shipped ? 'done' : (paid ? 'current' : '') %>">Enviado</li>
+  </ol>
+<% } %>
+
+<div class="layout-2">
+  <div>
+    <% if (st === 'pending' && !stripeConfigured) { %>
+      <section class="panel" style="margin-bottom:24px">
+        <h2>Como pagar</h2>
+        <p>Haz el pago por <b>Bizum</b> o <b>transferencia</b> e indica <b>Pedido #<%= order.id %></b> en el concepto. Prepararemos tu pedido en cuanto lo recibamos.</p>
+        <div class="pay-box">
+          <% if (bizumPhone) { %>
+          <div class="pay-row"><div><small>Bizum</small><b><%= bizumPhone %></b></div><button class="btn small secondary" type="button" data-copy="<%= bizumPhone %>">Copiar</button></div>
+          <% } %>
+          <% if (bankIban) { %>
+          <div class="pay-row"><div><small>Transferencia (IBAN)</small><b><%= bankIban %></b></div><button class="btn small secondary" type="button" data-copy="<%= bankIban %>">Copiar</button></div>
+          <% } %>
+          <div class="pay-row"><div><small>Concepto</small><b>Pedido #<%= order.id %></b></div><button class="btn small secondary" type="button" data-copy="Pedido #<%= order.id %>">Copiar</button></div>
+          <div class="pay-row"><div><small>Importe exacto</small><b><%= euro(order.total_cents) %></b></div></div>
+        </div>
+        <small>Si no recibimos el pago en unos días, el pedido se cancelara y las unidades volveran a estar disponibles.</small>
+      </section>
+    <% } else if (st === 'pending') { %>
+      <div class="flash info"><div class="flash-body">Estamos esperando la confirmación del pago.</div></div>
+    <% } else if (paid) { %>
+      <div class="flash success"><div class="flash-body">
+        <% if (shipped) { %>Tu pedido ya va de camino.<% } else { %>Pago recibido. Estamos preparando tu pedido.<% } %>
+        <% if (order.tracking_number) { %><br />Número de seguimiento: <b><%= order.tracking_number %></b><% } %>
+      </div></div>
+    <% } %>
+
+    <section class="panel">
+      <h2>Datos de envío</h2>
+      <dl class="kv">
+        <dt>Nombre</dt><dd><%= shipTo.name || order.customer_name %></dd>
+        <dt>Email</dt><dd><%= shipTo.email || order.customer_email %></dd>
+        <dt>Dirección</dt><dd><%= shipTo.address %>, <%= shipTo.postal_code %> <%= shipTo.city %> (<%= shipTo.country %>)</dd>
+      </dl>
+    </section>
+  </div>
+
+  <aside class="panel" aria-label="Resumen">
+    <h2>Resumen</h2>
+    <% items.forEach((i) => { %>
+      <div class="mini-line"><span><%= i.title %> &times; <%= i.quantity %></span><span><%= euro(i.price_cents * i.quantity) %></span></div>
+    <% }) %>
+    <div class="summary-row"><span>Envío</span><span><%= shippingCents ? euro(shippingCents) : 'Gratis' %></span></div>
+    <div class="summary-row total"><span>Total</span><span><%= euro(order.total_cents) %></span></div>
+    <a class="btn secondary block" style="margin-top:16px" href="/">Volver a la tienda</a>
+  </aside>
+</div>
+
+<%- include('partials/footer') %>
