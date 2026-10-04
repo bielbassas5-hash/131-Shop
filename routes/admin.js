@@ -2,7 +2,7 @@ const express = require('express');
 const multer = require('multer');
 const db = require('../db');
 const { requireAdmin, adminHeaders } = require('../middleware/auth');
-const { saveImage, UserError } = require('../lib/imageStorage');
+const { saveImage, deleteImage, UserError } = require('../lib/imageStorage');
 const { wrap, createLimiter, safeEqual } = require('../lib/security');
 const { validateProduct, text } = require('../lib/validate');
 const { STATUSES, setStatus, StockError } = require('../lib/orders');
@@ -177,6 +177,7 @@ router.post(
        WHERE id = ?`,
       [v.values.title, v.values.description, v.price_cents, image_path, v.values.type, v.stock, active ? 1 : 0, product.id]
     );
+    if (image_path !== product.image_path) await deleteImage(product.image_path);
     req.session.flash = { type: 'success', msg: 'Cambios guardados.' };
     res.redirect('/admin');
   })
@@ -189,6 +190,7 @@ router.post(
     const product = await findProduct(req);
     if (product) {
       await db.run('DELETE FROM products WHERE id = ?', [product.id]);
+      await deleteImage(product.image_path);
       req.session.flash = { type: 'success', msg: `"${product.title}" eliminado.` };
     }
     res.redirect('/admin');
@@ -232,7 +234,7 @@ router.get(
       if (!byOrder.has(it.order_id)) byOrder.set(it.order_id, []);
       byOrder.get(it.order_id).push(`${it.quantity}x ${it.title}`);
     }
-    const header = ['Pedido', 'Fecha', 'Estado', 'Nombre', 'Email', 'Teléfono', 'Dirección', 'Ciudad', 'CP', 'País', 'Total EUR', 'Seguimiento', 'Artículos'];
+    const header = ['Pedido', 'Fecha', 'Estado', 'Nombre', 'Email', 'Teléfono', 'Dirección', 'Ciudad', 'CP', 'País', 'Total EUR', 'Entrega', 'Notas', 'Seguimiento', 'Artículos'];
     const rows = orders.map((o) => {
       let s = {};
       try {
@@ -243,7 +245,7 @@ router.get(
       return [
         o.id, o.created_at, STATUS_LABELS[o.status] || o.status, s.name || o.customer_name, s.email || o.customer_email,
         s.phone, s.address, s.city, s.postal_code, s.country, (o.total_cents / 100).toFixed(2),
-        o.tracking_number, (byOrder.get(o.id) || []).join(' | '),
+        o.shipping_method === 'pickup' ? 'Recogida' : 'Envío', s.notes, o.tracking_number, (byOrder.get(o.id) || []).join(' | '),
       ].map(csvCell).join(',');
     });
     res.set('Content-Type', 'text/csv; charset=utf-8');

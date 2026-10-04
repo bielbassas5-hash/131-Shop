@@ -53,7 +53,12 @@
       <dl class="kv">
         <dt>Nombre</dt><dd><%= shipTo.name || order.customer_name %></dd>
         <dt>Email</dt><dd><%= shipTo.email || order.customer_email %></dd>
-        <dt>Dirección</dt><dd><%= shipTo.address %>, <%= shipTo.postal_code %> <%= shipTo.city %> (<%= shipTo.country %>)</dd>
+        <% if (order.shipping_method === 'pickup') { %>
+          <dt>Entrega</dt><dd><b>Recogida en mano</b> — te escribiremos para quedar<%= shop.pickupNote ? ' (' + shop.pickupNote + ')' : '' %>.</dd>
+        <% } else { %>
+          <dt>Dirección</dt><dd><%= shipTo.address %>, <%= shipTo.postal_code %> <%= shipTo.city %> (<%= shipTo.country %>)</dd>
+        <% } %>
+        <% if (shipTo.notes) { %><dt>Notas</dt><dd style="white-space:pre-line"><%= shipTo.notes %></dd><% } %>
       </dl>
     </section>
   </div>

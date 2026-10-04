@@ -97,6 +97,8 @@ app.use((req, res, next) => {
     shippingCents: shippingCost(),
     freeFrom: freeShippingThreshold(),
     contactEmail: process.env.CONTACT_EMAIL || '',
+    pickupEnabled: process.env.PICKUP_ENABLED === '1',
+    pickupNote: (process.env.PICKUP_NOTE || '').slice(0, 200),
     instagram: (process.env.INSTAGRAM || '').replace(/^@/, '').replace(/[^\w.]/g, ''),
     siteUrl: (process.env.SITE_URL || `${req.protocol}://${req.get('host')}`).replace(/\/+$/, ''),
     legalName: process.env.LEGAL_NAME || '',

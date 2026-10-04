@@ -98,7 +98,9 @@ async function main() {
       ADMIN_PASSWORD,
       SESSION_SECRET: 'test-session-secret-0123456789',
       SHIPPING_COST_CENTS: '350',
-      FREE_SHIPPING_THRESHOLD_CENTS: '3000',
+      FREE_SHIPPING_THRESHOLD_CENTS: '10000',
+      PICKUP_ENABLED: '1',
+      PICKUP_NOTE: 'Zona centro',
       BIZUM_PHONE: '600111222',
       BANK_IBAN: 'ES00 1111 2222 3333 4444 5555',
     },
@@ -223,6 +225,28 @@ async function main() {
     // IDOR: otro cliente no ve el pedido sin el token
     check('pedido ajeno por id no accesible', (await rival.get('/pedido/1')).status === 404);
 
+    console.log('\n# Recogida en mano, notas y envio gratis');
+    const pk = new Client();
+    const pt = await pk.csrf('/producto/2');
+    await pk.post('/agregar/2', { _csrf: pt, back: '/' });
+    const co = await pk.get('/checkout');
+    check('checkout ofrece recogida en mano', co.text.includes('Recogida en mano') && co.text.includes('Zona centro'));
+    const base = { _csrf: pt, name: 'Luis Gil', email: 'luis@example.com', accept: '1', method: 'pickup', notes: 'Dedicatoria: para Marta' };
+    check('recogida sin telefono rechazada', (await pk.post('/checkout/crear', { ...base })).status === 400);
+    check('envio sin direccion rechazado', (await pk.post('/checkout/crear', { ...base, method: 'ship', phone: '600123123' })).status === 400);
+    const pko = await pk.post('/checkout/crear', { ...base, phone: '600123123' });
+    check('pedido de recogida creado sin direccion', pko.status === 302 && /^\/pedido\//.test(pko.location || ''), pko.location);
+    const pkPage = await pk.get(pko.location);
+    check('recogida: total sin envio (40,00)', /40,00/.test(pkPage.text) && !/43,50/.test(pkPage.text));
+    check('notas visibles en el pedido', pkPage.text.includes('Dedicatoria: para Marta'));
+    const shipc = new Client();
+    const sct = await shipc.csrf('/producto/2');
+    await shipc.post('/agregar/2', { _csrf: sct, back: '/' });
+    check('envio normal con producto de 40 EUR (43,50)', /43,50/.test((await shipc.get('/carrito')).text));
+    await shipc.post('/actualizar/2', { _csrf: sct, quantity: '3' });
+    const freeCart = await shipc.get('/carrito');
+    check('envio gratis al superar el umbral', /Gratis/.test(freeCart.text) && /120,00/.test(freeCart.text));
+
     console.log('\n# Gestion de pedidos (admin)');
     tok = await admin.csrf('/admin');
     const orders = await admin.get('/admin/pedidos');
@@ -247,7 +271,12 @@ async function main() {
       multipart: productForm({ title: 'Editado', description: '', price: '5', stock: '9', type: 'sticker', active: '1' }),
     });
     check('editar producto', ed.status === 302 && (await anon.get('/producto/1')).text.includes('Editado'));
+    const prod2 = await anon.get('/producto/2');
+    const imgMatch = prod2.text.match(/src="(\/uploads\/[^"]+)"/);
+    const imgFile = imgMatch ? path.join(uploadsDir, path.basename(imgMatch[1])) : null;
+    check('imagen local existe antes de borrar', !!imgFile && fs.existsSync(imgFile));
     const del = await admin.post('/admin/productos/2/eliminar', { _csrf: tok });
+    check('imagen local borrada con el producto', !!imgFile && !fs.existsSync(imgFile));
     check('eliminar producto', del.status === 302 && (await anon.get('/producto/2')).status === 404);
     check('eliminar con pedido asociado no falla', (await admin.post('/admin/productos/1/eliminar', { _csrf: tok })).status === 302);
     check('pedido sigue existiendo', (await admin.get('/admin/pedidos/1')).status === 200);

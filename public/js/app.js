@@ -51,6 +51,27 @@
     }
   });
 
+  // Checkout: alternar envio / recogida y recalcular el resumen
+  var radios = document.querySelectorAll('input[name="method"][data-ship-cents]');
+  var summary = document.querySelector('[data-summary]');
+  if (radios.length && summary) {
+    var fmt = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' });
+    var shipFields = document.querySelector('[data-ship-fields]');
+    var update = function () {
+      var sel = document.querySelector('input[name="method"]:checked');
+      if (!sel) return;
+      var ship = parseInt(sel.getAttribute('data-ship-cents'), 10) || 0;
+      var subtotal = parseInt(summary.getAttribute('data-subtotal'), 10) || 0;
+      var shipOut = summary.querySelector('[data-ship-out]');
+      var totalOut = summary.querySelector('[data-total-out]');
+      if (shipOut) shipOut.textContent = ship ? fmt.format(ship / 100) : 'Gratis';
+      if (totalOut) totalOut.textContent = fmt.format((subtotal + ship) / 100);
+      if (shipFields) shipFields.hidden = sel.value === 'pickup';
+    };
+    radios.forEach(function (r) { r.addEventListener('change', update); });
+    update();
+  }
+
   // Vista previa de la imagen en el formulario de producto
   var fileInput = document.querySelector('input[type="file"][data-preview]');
   if (fileInput) {

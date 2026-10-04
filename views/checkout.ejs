@@ -31,11 +31,20 @@
         <%- err('email') %>
       </div>
       <div class="field">
-        <label for="phone">Teléfono (opcional)</label>
+        <label for="phone">Teléfono<%= shop.pickupEnabled ? ' (obligatorio si recoges en mano)' : ' (opcional)' %></label>
         <input id="phone" type="tel" name="phone" value="<%= v.phone || '' %>" autocomplete="tel" maxlength="20" <%- bad('phone') %> />
         <%- err('phone') %>
       </div>
     </div>
+    <% if (shop.pickupEnabled) { %>
+    <fieldset class="field method-box">
+      <legend>Cómo quieres recibirlo</legend>
+      <label class="check method-opt"><input type="radio" name="method" value="ship"<%= v.method !== 'pickup' ? ' checked' : '' %> data-ship-cents="<%= cart.shipping %>" /><span><b>Envío a domicilio</b> <small>· <%= cart.shipping ? euro(cart.shipping) : 'Gratis' %></small></span></label>
+      <label class="check method-opt"><input type="radio" name="method" value="pickup"<%= v.method === 'pickup' ? ' checked' : '' %> data-ship-cents="0" /><span><b>Recogida en mano</b> <small>· Gratis<%= shop.pickupNote ? ' · ' + shop.pickupNote : '' %></small></span></label>
+    </fieldset>
+    <% } %>
+
+    <div data-ship-fields>
     <div class="field">
       <label for="address">Dirección</label>
       <input id="address" type="text" name="address" value="<%= v.address || '' %>" autocomplete="street-address" maxlength="120" required <%- bad('address') %> />
@@ -60,11 +69,17 @@
       </select>
       <%- err('country') %>
     </div>
+    </div>
+
+    <div class="field">
+      <label for="notes">Notas del pedido (opcional)</label>
+      <textarea id="notes" name="notes" maxlength="300" style="min-height:80px" placeholder="Dedicatoria, indicaciones para la entrega..."><%= v.notes || '' %></textarea>
+    </div>
 
     <div class="field">
       <label class="check" for="accept" style="color:var(--muted)">
         <input id="accept" type="checkbox" name="accept" value="1" <%- bad('accept') %> />
-        <span>He leido y acepto las <a href="/legal/condiciones" target="_blank" rel="noopener">condiciones de compra</a> y la <a href="/legal/privacidad" target="_blank" rel="noopener">política de privacidad</a>.</span>
+        <span>He leído y acepto las <a href="/legal/condiciones" target="_blank" rel="noopener">condiciones de compra</a> y la <a href="/legal/privacidad" target="_blank" rel="noopener">política de privacidad</a>.</span>
       </label>
       <%- err('accept') %>
     </div>
@@ -72,13 +87,13 @@
     <button class="btn block" type="submit"><%= stripeConfigured ? 'Continuar al pago con tarjeta' : 'Confirmar pedido' %></button>
   </form>
 
-  <aside class="panel sticky" aria-label="Resumen del pedido">
+  <aside class="panel sticky" aria-label="Resumen del pedido" data-summary data-subtotal="<%= cart.subtotal %>">
     <h2>Tu pedido</h2>
     <% cart.items.forEach((i) => { %>
       <div class="mini-line"><span><%= i.title %> &times; <%= i.quantity %></span><span><%= euro(i.subtotal) %></span></div>
     <% }) %>
-    <div class="summary-row"><span>Envío</span><span><%= cart.shipping ? euro(cart.shipping) : 'Gratis' %></span></div>
-    <div class="summary-row total"><span>Total</span><span><%= euro(cart.total) %></span></div>
+    <div class="summary-row"><span>Envío</span><span data-ship-out><%= cart.shipping ? euro(cart.shipping) : 'Gratis' %></span></div>
+    <div class="summary-row total"><span>Total</span><span data-total-out><%= euro(cart.total) %></span></div>
     <p style="margin:14px 0 0"><a class="link" href="/carrito">Editar carrito</a></p>
   </aside>
 </div>
