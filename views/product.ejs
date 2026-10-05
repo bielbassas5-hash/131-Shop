@@ -96,7 +96,6 @@
       <ul>
         <li>Envío <%= shop.freeFrom ? 'desde ' + euro(shop.shippingCents) + ', gratis a partir de ' + euro(shop.freeFrom) : 'a ' + euro(shop.shippingCents) + ' por pedido' %></li>
         <% if (!shop.trackStock) { %><li>Se elabora bajo pedido<%= shop.leadTime ? ' · plazo de ' + shop.leadTime : '' %></li><% } %>
-        <li><a class="link" href="/legal/condiciones">Devoluciones en 14 días</a></li>
       </ul>
     </div>
     <div class="share" aria-label="Compartir">

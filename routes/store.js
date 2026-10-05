@@ -165,7 +165,7 @@ router.get(
 router.get('/preguntas-frecuentes', (req, res) => {
   res.render('faq', {
     items: buildFaq(res.locals.shop),
-    meta: { title: 'Preguntas frecuentes', description: 'Envíos, plazos, formatos, pagos y devoluciones.' },
+    meta: { title: 'Preguntas frecuentes', description: 'Envíos, plazos, formatos y pagos.' },
   });
 });
 
