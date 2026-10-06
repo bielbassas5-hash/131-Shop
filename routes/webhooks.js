@@ -1,4 +1,5 @@
 const express = require('express');
+const { siteUrl } = require('../lib/siteUrl');
 const { stripe, stripeConfigured, confirmSession, expireSession } = require('../lib/payments');
 
 const router = express.Router();
@@ -17,7 +18,7 @@ router.post('/webhooks/stripe', express.raw({ type: 'application/json', limit: '
   }
 
   try {
-    const base = process.env.SITE_URL || `${req.protocol}://${req.get('host')}`;
+    const base = siteUrl(req);
     if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded') {
       await confirmSession(event.data.object, base);
     } else if (event.type === 'checkout.session.expired') {

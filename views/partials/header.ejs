@@ -15,6 +15,8 @@
   <script src="/js/theme-init.js"></script>
   <% if (m.noindex) { %><meta name="robots" content="noindex, nofollow" />
   <% } else { %><link rel="canonical" href="<%= shop.siteUrl + (m.canonicalPath || currentPath) %>" /><% } %>
+  <meta property="og:locale" content="es_ES" />
+  <% if (!m.noindex) { %><meta property="og:url" content="<%= shop.siteUrl + (m.canonicalPath || currentPath) %>" /><% } %>
   <meta property="og:site_name" content="<%= artistName %>" />
   <meta property="og:title" content="<%= pageTitle %>" />
   <meta property="og:description" content="<%= pageDesc %>" />

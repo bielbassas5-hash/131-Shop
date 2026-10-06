@@ -260,6 +260,40 @@ async function suiteStripe() {
 }
 
 // Limite global de peticiones por IP: responde 429 en texto plano y no afecta a los archivos estaticos
+async function suiteSiteUrl() {
+  console.log('\n# Direccion publica, Host falsificado y security.txt');
+  const port = 3062;
+  const dbFile = path.join(os.tmpdir(), `tienda131-test6-${Date.now()}.db`);
+  const srv = spawn(process.execPath, ['server.js'], {
+    cwd: path.join(__dirname, '..'),
+    env: { ...baseEnv(), PORT: String(port), TURSO_DATABASE_URL: 'file:' + dbFile.replace(/\\/g, '/'), STRIPE_SECRET_KEY: '', SITE_URL: '', RENDER_EXTERNAL_URL: 'https://render.test/', CONTACT_EMAIL: 'hola@render.test' },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  const withHost = (p, host) =>
+    new Promise((resolve, reject) => {
+      const r = http.request({ host: '127.0.0.1', port, path: p, headers: { Host: host } }, (res) => {
+        let d = '';
+        res.on('data', (c) => (d += c));
+        res.on('end', () => resolve({ status: res.statusCode, text: d }));
+      });
+      r.on('error', reject);
+      r.end();
+    });
+  try {
+    await waitForServer(`http://127.0.0.1:${port}`);
+    const home = await withHost('/', 'evil.example');
+    check('con RENDER_EXTERNAL_URL se ignora el Host falsificado (canonical)', home.text.includes('href="https://render.test/"') && !home.text.includes('evil.example'));
+    const sm = await withHost('/sitemap.xml', 'evil.example');
+    check('el sitemap usa la direccion configurada', sm.text.includes('<loc>https://render.test/</loc>') && !sm.text.includes('evil.example'));
+    const sec = await withHost('/.well-known/security.txt', 'evil.example');
+    check('security.txt con contacto y caducidad', sec.status === 200 && /^Contact: mailto:hola@render\.test$/m.test(sec.text) && /^Expires: \d{4}-/m.test(sec.text) && sec.text.includes('https://render.test/.well-known/security.txt'));
+  } finally {
+    srv.kill();
+    await sleep(300);
+    for (const f of [dbFile, dbFile + '-wal', dbFile + '-shm']) { try { fs.rmSync(f, { force: true }); } catch (_) { /* bloqueado en Windows */ } }
+  }
+}
+
 async function suiteRateLimit() {
   console.log('\n# Limite global de peticiones');
   const port = 3061;
@@ -1113,6 +1147,7 @@ async function main() {
     await suiteProdAndMigration();
     await suiteMadeToOrder();
     await suiteRateLimit();
+    await suiteSiteUrl();
   } finally {
     server.kill();
     mailSrv.close();

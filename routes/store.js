@@ -1,4 +1,5 @@
 const express = require('express');
+const { siteUrl } = require('../lib/siteUrl');
 const db = require('../db');
 const { wrap } = require('../lib/security');
 const { TYPES, TYPE_LABELS, TYPE_PLURALS } = require('../lib/format');
@@ -198,9 +199,18 @@ router.get('/legal/:page', (req, res) => {
 });
 
 // ---- SEO / infraestructura ----
-function siteUrl(req) {
-  return (process.env.SITE_URL || `${req.protocol}://${req.get('host')}`).replace(/\/+$/, '');
-}
+
+// RFC 9116: a quien avisar si alguien encuentra un fallo de seguridad
+router.get('/.well-known/security.txt', (req, res) => {
+  const mail = process.env.CONTACT_EMAIL;
+  if (!mail || /[\s<>]/.test(mail)) return res.status(404).render('error', { status: 404 });
+  const expires = new Date(Date.now() + 365 * 24 * 3600 * 1000).toISOString();
+  res.type('text/plain; charset=utf-8').send(`Contact: mailto:${mail}
+Expires: ${expires}
+Preferred-Languages: es, en
+Canonical: ${siteUrl(req)}/.well-known/security.txt
+`);
+});
 
 router.get('/robots.txt', (req, res) => {
   res.type('text/plain').send(

@@ -1,4 +1,5 @@
 const express = require('express');
+const { siteUrl } = require('../lib/siteUrl');
 const db = require('../db');
 const { wrap, createLimiter } = require('../lib/security');
 const { loadCart, createOrder, setStatus, paymentInfo, orderEvents, StockError } = require('../lib/orders');
@@ -14,7 +15,7 @@ const lookupLimiter = createLimiter({ windowMs: 60 * 60 * 1000, max: 10 });
 const TOKEN_RE = /^[a-f0-9]{32}$/;
 
 function baseUrl(req) {
-  return (process.env.SITE_URL || `${req.protocol}://${req.get('host')}`).replace(/\/+$/, '');
+  return siteUrl(req);
 }
 
 function renderCheckout(res, cart, values, errors, status = 200) {

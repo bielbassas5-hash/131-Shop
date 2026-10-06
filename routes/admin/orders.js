@@ -1,5 +1,6 @@
 // Pedidos: listado, detalle, estados, exportacion CSV y avisos al cliente.
 const express = require('express');
+const { siteUrl } = require('../../lib/siteUrl');
 const db = require('../../db');
 const { requireAdmin } = require('../../middleware/auth');
 const { wrap } = require('../../lib/security');
@@ -98,7 +99,7 @@ router.get(
     } catch (_) {
       /* sin datos */
     }
-    const base = (process.env.SITE_URL || `${req.protocol}://${req.get('host')}`).replace(/\/+$/, '');
+    const base = siteUrl(req);
     const link = `${base}/pedido/${order.token}`;
     const body =
       `Hola ${shipTo.name || ''},\n\nTu pedido #${order.id} ya está en camino.\n` +

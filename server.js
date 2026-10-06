@@ -11,6 +11,7 @@ const DbStore = require('./lib/sessionStore');
 const { csrf, createLimiter, clientIp } = require('./lib/security');
 const { euro, dateTime, thumb, TYPE_LABELS, TYPE_PLURALS, STATUS_LABELS } = require('./lib/format');
 const siteSettings = require('./lib/siteSettings');
+const { siteUrl } = require('./lib/siteUrl');
 const { shippingCost, freeShippingThreshold, expirePending, trackStock } = require('./lib/orders');
 
 const storeRoutes = require('./routes/store');
@@ -130,7 +131,7 @@ app.use((req, res, next) => {
     pickupEnabled: process.env.PICKUP_ENABLED === '1',
     pickupNote: (process.env.PICKUP_NOTE || '').slice(0, 200),
     instagram: (process.env.INSTAGRAM || '').replace(/^@/, '').replace(/[^\w.]/g, ''),
-    siteUrl: (process.env.SITE_URL || `${req.protocol}://${req.get('host')}`).replace(/\/+$/, ''),
+    siteUrl: siteUrl(req),
     legalName: process.env.LEGAL_NAME || '',
     legalNif: process.env.LEGAL_NIF || '',
     legalAddress: process.env.LEGAL_ADDRESS || '',
