@@ -34,7 +34,7 @@
         <h2><a href="<%= productUrl(featured) %>"><%= featured.title %></a></h2>
         <% if (featured.description) { %><p class="desc"><%= featured.description.replace(/\s+/g, ' ').slice(0, 200) %><%= featured.description.length > 200 ? '…' : '' %></p><% } %>
         <span class="price"><%= featured.variant_count > 0 ? 'Desde ' : '' %><%= euro(featured.price_cents) %></span>
-        <a class="btn" href="<%= productUrl(featured) %>">Ver obra</a>
+        <a class="btn" href="<%= productUrl(featured) %>">Ver</a>
       </div>
     </section>
   <% } %>
