@@ -1108,6 +1108,16 @@ async function main() {
     const alerts = mailTo('owner@example.com', /Intentos fallidos de acceso/);
     check('aviso por email tras varios intentos fallidos (solo uno por hora)', alerts.length === 1 && /IP 127\.0\.0\.1|IP ::1|IP ::ffff:127\.0\.0\.1/.test(alerts[0].textContent), String(alerts.length));
 
+    console.log('\n# Portada: obra destacada');
+    const homeAll = (await anon.get('/')).text;
+    check('la portada sin filtros muestra la ultima obra en grande', /<section class="feature"/.test(homeAll) && /class="eyebrow">Última obra añadida/.test(homeAll) && homeAll.includes('Todas las obras'));
+    check('la portada mantiene un unico h1 (accesible)', (homeAll.match(/<h1[ >]/g) || []).length === 1);
+    check('con filtros no hay obra destacada', !/<section class="feature"/.test((await anon.get('/?tipo=print')).text) && !/<section class="feature"/.test((await anon.get('/?q=Obra')).text) && !/<section class="feature"/.test((await anon.get('/?orden=precio_asc')).text));
+    const featId = homeAll.match(/class="feature-body">[\s\S]*?href="\/producto\/(\d+)/)[1];
+    const gridIds = [...homeAll.split('class="catalog-head"')[1].matchAll(/class="card[^"]*" href="\/producto\/(\d+)/g)].map((m) => m[1]);
+    check('la obra destacada no se repite en la cuadricula', gridIds.length > 0 && !gridIds.includes(featId));
+    check('sin estilos en linea en la portada (CSP)', !/ style="/.test(homeAll));
+
     console.log('\n# Ficha tecnica, referencia, compartir y paginas informativas');
     const dfields = { title: 'Obra con ficha', description: 'Texto', type: 'print', stock: '5', price: '12' };
     const dcreate = (extra) => admin.req('POST', `/admin/productos/nuevo?_csrf=${tok}`, { multipart: productForm({ ...dfields, ...extra }, png(0)) });

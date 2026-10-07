@@ -58,8 +58,13 @@ async function renderCatalog(req, res, theme) {
     themesLib.publicThemes(),
   ]);
 
+  // Portada sin filtros: la obra mas reciente se muestra grande y el resto va en la cuadricula
+  const featured = !theme && !tipo && !q && orden === 'nuevo' && products.length >= 5 && products[0].image_path ? products[0] : null;
+
   res.render('index', {
-    products,
+    products: featured ? products.slice(1) : products,
+    featured,
+    total: products.length,
     theme,
     themes,
     filters: { tipo, orden, q, tema: theme ? theme.slug : '' },

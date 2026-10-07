@@ -11,8 +11,10 @@
     <% } else if (low) { %><span class="badge-corner warn">Últimas unidades</span><% } %>
   </div>
   <div class="card-body">
+    <div class="card-line">
+      <h3><%= p.title %></h3>
+      <span class="price"><%= p.variant_count > 0 ? 'Desde ' : '' %><%= euro(p.price_cents) %></span>
+    </div>
     <span class="tag"><%= TYPE_LABELS[p.type] || p.type %></span>
-    <h3><%= p.title %></h3>
-    <div class="card-foot"><span class="price"><%= p.variant_count > 0 ? 'Desde ' : '' %><%= euro(p.price_cents) %></span></div>
   </div>
 </a>

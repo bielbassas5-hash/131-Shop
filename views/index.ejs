@@ -11,15 +11,36 @@
 %>
 
 <section aria-labelledby="catalogo-titulo">
-  <div class="page-head">
-    <h1 id="catalogo-titulo"><%= theme ? theme.name : (filters.tipo ? TYPE_PLURALS[filters.tipo] : 'Tienda') %></h1>
-    <p class="muted">
-      Envío <%= euro(shop.shippingCents) %><% if (shop.freeFrom) { %>, gratis desde <%= euro(shop.freeFrom) %><% } %><% if (shop.pickupEnabled) { %> · Recogida en mano disponible<% } %>
-    </p>
+  <% if (featured) { %>
+    <h1 id="catalogo-titulo" class="sr-only">Tienda</h1>
+  <% } else { %>
+    <div class="page-head">
+      <h1 id="catalogo-titulo"><%= theme ? theme.name : (filters.tipo ? TYPE_PLURALS[filters.tipo] : 'Tienda') %></h1>
+    </div>
+  <% } %>
+  <div class="info-strip">
+    <span>Envío <%= euro(shop.shippingCents) %><% if (shop.freeFrom) { %>, gratis desde <%= euro(shop.freeFrom) %><% } %></span>
+    <% if (!shop.trackStock) { %><span>Se elabora bajo pedido<%= shop.leadTime ? ' · plazo de ' + shop.leadTime : '' %></span><% } %>
+    <% if (shop.pickupEnabled) { %><span>Recogida en mano disponible</span><% } %>
   </div>
 
+  <% if (featured) { %>
+    <section class="feature" aria-label="Última obra añadida">
+      <a class="feature-media" href="<%= productUrl(featured) %>" tabindex="-1" aria-hidden="true">
+        <img src="<%= thumb(featured.image_path, 1100) %>" alt="" width="1100" height="1100" fetchpriority="high" decoding="async" />
+      </a>
+      <div class="feature-body">
+        <span class="eyebrow">Última obra añadida · <%= TYPE_LABELS[featured.type] || featured.type %></span>
+        <h2><a href="<%= productUrl(featured) %>"><%= featured.title %></a></h2>
+        <% if (featured.description) { %><p class="desc"><%= featured.description.replace(/\s+/g, ' ').slice(0, 200) %><%= featured.description.length > 200 ? '…' : '' %></p><% } %>
+        <span class="price"><%= featured.variant_count > 0 ? 'Desde ' : '' %><%= euro(featured.price_cents) %></span>
+        <a class="btn" href="<%= productUrl(featured) %>">Ver obra</a>
+      </div>
+    </section>
+  <% } %>
+
   <div class="toolbar">
-    <div class="chips" role="group" aria-label="Filtrar por tipo">
+    <div class="chips tabs" role="group" aria-label="Filtrar por tipo">
       <a class="chip<%= !filters.tipo ? ' active' : '' %>" href="<%= link({ tipo: '' }) %>">Todo</a>
       <% ['dibujo', 'print', 'sticker'].forEach((t) => { %>
         <a class="chip<%= filters.tipo === t ? ' active' : '' %>" href="<%= link({ tipo: t }) %>"><%= TYPE_PLURALS[t] %></a>
@@ -50,7 +71,7 @@
     </nav>
   <% } %>
 
-  <% if (products.length === 0) { %>
+  <% if (total === 0) { %>
     <div class="empty-state">
       <% if (filtered) { %>
         <p>No hay resultados con esos filtros.</p>
@@ -60,6 +81,9 @@
       <% } %>
     </div>
   <% } else { %>
+    <% if (featured) { %>
+      <div class="catalog-head"><h2>Todas las obras</h2><span class="muted"><%= total %> en total</span></div>
+    <% } %>
     <div class="grid">
       <% products.forEach((p) => { %><%- include('partials/product-card', { p }) %><% }) %>
     </div>

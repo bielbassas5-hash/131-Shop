@@ -93,7 +93,7 @@ Define `STRIPE_SECRET_KEY` y crea en Stripe un webhook a `https://TU-WEB/webhook
 
 ## Diseño
 
-Obra siempre **entera** sobre un paspartú (nunca recortada), tarjetas tipo cartela, segunda imagen al pasar el ratón cuando el producto tiene galería, imagen ampliable en la ficha y **tema claro / oscuro** (sigue la preferencia del sistema y se puede cambiar con el botón de la cabecera). Los dos temas cumplen contraste AA. Las tipografías (Inter y Space Grotesk, licencia OFL) se sirven desde la propia web.
+Estilo de galería: fondo cálido, mucho aire, tipografía grande y botones de tinta (el rojo solo se usa como acento). La portada destaca la **última obra añadida** en grande y el resto va en una cuadrícula con título y precio en la misma línea; los filtros por tipo son pestañas y los temas, etiquetas. Obra siempre **entera** sobre un paspartú (nunca recortada), tarjetas tipo cartela, segunda imagen al pasar el ratón cuando el producto tiene galería, imagen ampliable en la ficha y **tema claro / oscuro** (sigue la preferencia del sistema y se puede cambiar con el botón de la cabecera). Los dos temas cumplen contraste AA. Las tipografías (Inter y Space Grotesk, licencia OFL) se sirven desde la propia web.
 
 ## Estructura
 
