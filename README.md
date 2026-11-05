@@ -83,6 +83,8 @@ En el formulario de producto, "Ficha técnica" admite hasta 8 líneas con el for
 
 **Panel → Sobre mí** guarda el texto de esa página (párrafos separados por una línea en blanco). Si lo dejas vacío, la página y su enlace del pie no existen. Las preguntas frecuentes se construyen con la configuración real (envío, plazo, medios de pago, recogida), así que nunca prometen algo que la tienda no ofrece.
 
+**Comparación de tamaños.** Si un producto tiene 2 o más formatos estándar (A5-A1), la ficha muestra una comparación a escala con el formato elegido resaltado. Los formatos propios no entran porque no se conocen sus medidas. En móvil aparece una barra inferior con el precio y "Comprar" cuando la caja de compra no está a la vista, y en la imagen se puede deslizar para cambiar de foto (también en la ampliada, con flechas o teclado).
+
 ### Producción bajo demanda
 
 No hay unidades ni "agotado". El límite es de 10 por línea de pedido. La ficha, el carrito y las condiciones indican que se elabora bajo pedido (y el `LEAD_TIME` si lo defines). El estado **En producción** informa al cliente de que su pedido se está elaborando. Si algún día necesitas stock, `TRACK_STOCK=1` lo reactiva (reserva al pedir, devolución al cancelar).

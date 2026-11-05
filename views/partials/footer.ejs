@@ -32,7 +32,8 @@
         </div>
       </div>
       <div class="footer-bottom">
-        &copy; <%= new Date().getFullYear() %> <%= artistName %>. Todos los derechos reservados.
+        <span>&copy; <%= new Date().getFullYear() %> <%= artistName %>. Todos los derechos reservados.</span>
+        <% if (shop.payments && shop.payments.length) { %><span>Pago: <%= shop.payments.join(' · ') %></span><% } %>
       </div>
     </div>
   </footer>

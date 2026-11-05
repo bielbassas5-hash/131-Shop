@@ -931,6 +931,13 @@ async function main() {
     const fId = (await anon.get('/?q=Lamina')).text.match(/\/producto\/(\d+)-lamina-a/)[1];
     const fpage = (await anon.get(`/producto/${fId}`)).text;
     check('la ficha ofrece los formatos con su medida', fpage.includes('A4 (21 × 29,7 cm)') && fpage.includes('A3 (29,7 × 42 cm)') && fpage.includes('Marco 30x40') && /id="product-price">18,00\s€/.test(fpage));
+    const guideRects = [...fpage.matchAll(/data-size-variant="(\d+)"/g)].map((m) => m[1]);
+    check('la ficha con 2+ formatos estandar muestra la comparacion de tamaños a escala', fpage.includes('class="size-guide"') && guideRects.length >= 2 && /aria-label="Comparación de tamaños a escala/.test(fpage));
+    check('cada tamaño de la comparacion corresponde a un formato del producto', guideRects.every((id) => [...fpage.matchAll(/name="variant" value="(\d+)"/g)].map((m) => m[1]).includes(id)));
+    check('la barra de compra movil y el visor con navegacion estan en la ficha con galeria', fpage.includes('data-sticky-buy') && fpage.includes('id="comprar"'));
+    check('formatos propios (sin medidas estandar) no muestran comparacion', !vpage.includes('class="size-guide"'));
+    check('el pie indica los medios de pago configurados', /Pago: Bizum · Transferencia/.test((await anon.get('/')).text));
+    check('color de barra del navegador en claro y oscuro', /name="theme-color"[^>]*prefers-color-scheme: dark/.test((await anon.get('/')).text));
     const fedit = (await admin.get(`/admin/productos/${fId}/editar`)).text;
     check('el formulario recuerda formatos activados y precios', /name="fmt" value="A4" checked/.test(fedit) && /name="fmt_price_A3" value="28,00"/.test(fedit) && /name="fmt" value="A1" checked/.test(fedit) && !/name="fmt" value="A2" checked/.test(fedit));
     check('el formulario muestra la calidad de cada formato', fedit.includes('3508 × 4961 px') && /Calidad óptima \(300 ppp\)/.test(fedit) && /Calidad aceptable \(212 ppp\)/.test(fedit) && /Resolución baja \(149 ppp\)/.test(fedit));

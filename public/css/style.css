@@ -401,7 +401,7 @@ table.simple img.thumb-sm { width: 52px; height: 52px; object-fit: contain; padd
   .wrap { padding: 0 16px; }
   .row2 { grid-template-columns: 1fr; }
   .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
-  .card-body { padding: 12px 14px 14px; }
+  .card-body { padding: 0 2px; }
   .price { font-size: 1.05rem; }
   .nav { gap: 14px; }
   .nav a { font-size: .9rem; }
@@ -583,3 +583,37 @@ dialog.lightbox .lb-close { position: fixed; top: 14px; right: 14px; width: 44px
 @media (max-width: 560px) {
   .card-line { flex-direction: column; gap: 2px; }
 }
+
+/* ---------- Comparacion de tamanos, barra de compra movil, navegacion del visor ---------- */
+.size-guide { margin: 0 0 18px; }
+.size-guide summary { cursor: pointer; font-size: .88rem; font-weight: 500; color: var(--muted); padding: 4px 0; }
+.size-guide summary:hover { color: var(--text); }
+.size-guide svg { display: block; width: 100%; height: auto; margin-top: 10px; }
+.size-guide rect { fill: var(--matte); stroke: var(--border-strong); stroke-width: 6; transition: fill .2s; }
+.size-guide text { fill: var(--muted); font: 500 64px var(--font-body); }
+.size-guide .size-item.active rect { fill: var(--text); stroke: var(--text); }
+.size-guide .size-item.active text { fill: var(--text); font-weight: 700; }
+
+.sticky-buy {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 12px 20px calc(12px + env(safe-area-inset-bottom));
+  background: var(--bg); border-top: 1px solid var(--border);
+}
+.sticky-buy .price { font-size: 1.25rem; }
+@media (min-width: 901px) { .sticky-buy { display: none !important; } }
+@media (max-width: 900px) { .site-footer { padding-bottom: 96px; } }
+
+dialog.lightbox .lb-nav {
+  position: fixed; top: 50%; transform: translateY(-50%); width: 48px; height: 64px;
+  border: 1px solid rgba(255, 255, 255, .3); border-radius: var(--radius-sm); background: rgba(0, 0, 0, .5);
+  color: #fff; font-size: 2rem; line-height: 1; cursor: pointer;
+}
+dialog.lightbox .lb-prev { left: 14px; }
+dialog.lightbox .lb-next { right: 14px; }
+dialog.lightbox .lb-nav:hover, dialog.lightbox .lb-close:hover { background: rgba(0, 0, 0, .8); }
+
+.footer-bottom { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 24px; }
+.card-media img { animation: fadein .5s ease backwards; }
+@keyframes fadein { from { opacity: 0; } }
+.card-media img.alt { animation: none; }

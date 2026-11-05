@@ -72,15 +72,32 @@
     update();
   }
 
-  // Ficha de producto: el precio mostrado sigue al formato elegido
+  // Ficha de producto: el precio mostrado (y el de la barra inferior) sigue al formato elegido,
+  // y la comparacion de tamaños resalta el seleccionado
   var priceEl = document.getElementById('product-price');
+  var stickyPrice = document.querySelector('[data-sticky-price]');
+  var sizeItems = document.querySelectorAll('[data-size-variant]');
   var variantRadios = document.querySelectorAll('input[name="variant"][data-price-label]');
   if (priceEl && variantRadios.length) {
     variantRadios.forEach(function (r) {
       r.addEventListener('change', function () {
-        if (r.checked) priceEl.textContent = r.getAttribute('data-price-label');
+        if (!r.checked) return;
+        priceEl.textContent = r.getAttribute('data-price-label');
+        if (stickyPrice) stickyPrice.textContent = r.getAttribute('data-price-label');
+        sizeItems.forEach(function (g) {
+          g.classList.toggle('active', g.getAttribute('data-size-variant') === r.value);
+        });
       });
     });
+  }
+
+  // Barra inferior con precio y "Comprar" (solo movil): aparece cuando la caja de compra no se ve
+  var stickyBar = document.querySelector('[data-sticky-buy]');
+  var buyBox = document.getElementById('comprar');
+  if (stickyBar && buyBox && 'IntersectionObserver' in window) {
+    new IntersectionObserver(function (entries) {
+      stickyBar.hidden = entries[0].isIntersecting;
+    }).observe(buyBox);
   }
 
   // Cambio de tema claro / oscuro (se recuerda en este navegador)
@@ -98,18 +115,56 @@
   // Imagen ampliada (ficha de producto)
   var lightbox = document.getElementById('lightbox');
   var zoomBtn = document.querySelector('[data-lightbox]');
+  var thumbs = document.querySelectorAll('[data-gallery-src]');
+  var mainImg = document.getElementById('main-image');
+  // Pasa a la imagen anterior (-1) o siguiente (1) de la galeria
+  function stepGallery(d) {
+    if (thumbs.length < 2) return;
+    var i = 0;
+    thumbs.forEach(function (t, idx) { if (t.classList.contains('active')) i = idx; });
+    thumbs[(i + d + thumbs.length) % thumbs.length].click();
+  }
+  // Gesto de deslizar: izquierda = siguiente, derecha = anterior
+  function onSwipe(el, cb) {
+    var startX = null;
+    el.addEventListener('touchstart', function (e) { startX = e.touches[0].clientX; }, { passive: true });
+    el.addEventListener('touchend', function (e) {
+      if (startX === null) return;
+      var dx = e.changedTouches[0].clientX - startX;
+      startX = null;
+      if (Math.abs(dx) >= 50) cb(dx < 0 ? 1 : -1);
+    }, { passive: true });
+  }
+
   if (lightbox && zoomBtn && typeof lightbox.showModal === 'function') {
     var lbImg = lightbox.querySelector('img');
     zoomBtn.addEventListener('click', function () {
       lbImg.src = zoomBtn.getAttribute('data-full');
       lightbox.showModal();
     });
-    lightbox.addEventListener('click', function () { lightbox.close(); }); // clic en cualquier parte cierra
+    lightbox.addEventListener('click', function (e) {
+      var nav = e.target.closest && e.target.closest('[data-lb-step]');
+      if (nav) {
+        stepGallery(parseInt(nav.getAttribute('data-lb-step'), 10));
+        lbImg.src = zoomBtn.getAttribute('data-full');
+        return;
+      }
+      lightbox.close(); // clic en cualquier otra parte cierra
+    });
+    lightbox.addEventListener('keydown', function (e) {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      stepGallery(e.key === 'ArrowLeft' ? -1 : 1);
+      lbImg.src = zoomBtn.getAttribute('data-full');
+    });
+    onSwipe(lightbox, function (d) {
+      stepGallery(d);
+      lbImg.src = zoomBtn.getAttribute('data-full');
+    });
   }
 
-  // Galeria de la ficha de producto: cambia la imagen principal sin recargar
-  var thumbs = document.querySelectorAll('[data-gallery-src]');
-  var mainImg = document.getElementById('main-image');
+  // Galeria de la ficha de producto: cambia la imagen principal sin recargar (miniaturas y deslizar)
+  var galleryEl = document.querySelector('.product-gallery');
+  if (galleryEl && thumbs.length > 1) onSwipe(galleryEl, stepGallery);
   if (thumbs.length && mainImg) {
     thumbs.forEach(function (a) {
       a.addEventListener('click', function (e) {

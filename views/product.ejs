@@ -70,7 +70,7 @@
       </dl>
     <% } %>
 
-    <div class="buy-box">
+    <div class="buy-box" id="comprar">
       <% if (!soldOut) { %>
         <form method="POST" action="/agregar/<%= product.id %>">
           <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
@@ -85,6 +85,20 @@
                 </label>
               <% }) %>
             </fieldset>
+            <% if (sizeGuide) { %>
+              <details class="size-guide">
+                <summary>Comparar tamaños</summary>
+                <svg viewBox="0 0 <%= sizeGuide.width %> <%= sizeGuide.height %>" role="img" aria-label="Comparación de tamaños a escala: <%= sizeGuide.rects.map((r) => r.label).join(', ') %>">
+                  <% sizeGuide.rects.forEach((r, idx) => { %>
+                    <g class="size-item<%= idx === 0 ? ' active' : '' %>" data-size-variant="<%= r.variantId %>">
+                      <rect x="<%= r.x %>" y="<%= r.y %>" width="<%= r.w %>" height="<%= r.h %>" />
+                      <text x="<%= r.cx %>" y="<%= r.ty %>" text-anchor="middle"><%= r.id %></text>
+                    </g>
+                  <% }) %>
+                </svg>
+                <p class="field-hint">Los tamaños están a escala entre sí.</p>
+              </details>
+            <% } %>
           <% } %>
           <button class="btn block" type="submit">Añadir al carrito</button>
         </form>
@@ -116,8 +130,19 @@
   </div>
 <% } %>
 
+<% if (!soldOut) { %>
+  <div class="sticky-buy" data-sticky-buy hidden>
+    <span class="price" data-sticky-price><%= euro(variants.length ? variants[0].price_cents : product.price_cents) %></span>
+    <a class="btn" href="#comprar">Comprar</a>
+  </div>
+<% } %>
+
 <dialog class="lightbox" id="lightbox" aria-label="Imagen ampliada">
   <button type="button" class="lb-close" aria-label="Cerrar" data-lb-close>&times;</button>
+  <% if (gallery.length > 1) { %>
+    <button type="button" class="lb-nav lb-prev" aria-label="Imagen anterior" data-lb-step="-1">&#8249;</button>
+    <button type="button" class="lb-nav lb-next" aria-label="Imagen siguiente" data-lb-step="1">&#8250;</button>
+  <% } %>
   <div class="lb-body"><img alt="" /></div>
 </dialog>
 

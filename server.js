@@ -12,7 +12,8 @@ const { csrf, createLimiter, clientIp } = require('./lib/security');
 const { euro, dateTime, thumb, TYPE_LABELS, TYPE_PLURALS, STATUS_LABELS } = require('./lib/format');
 const siteSettings = require('./lib/siteSettings');
 const { siteUrl } = require('./lib/siteUrl');
-const { shippingCost, freeShippingThreshold, expirePending, trackStock } = require('./lib/orders');
+const { shippingCost, freeShippingThreshold, expirePending, trackStock, paymentInfo } = require('./lib/orders');
+const { stripeConfigured } = require('./lib/payments');
 
 const storeRoutes = require('./routes/store');
 const cartRoutes = require('./routes/cart');
@@ -122,7 +123,9 @@ app.use((req, res, next) => {
   res.locals.meta = {};
   res.locals.hasAbout = !!siteSettings.getAbout();
   res.locals.isAdmin = !!(req.session && req.session.isAdmin);
+  const pay = paymentInfo();
   res.locals.shop = {
+    payments: [pay.bizum ? 'Bizum' : '', pay.iban ? 'Transferencia' : '', stripeConfigured ? 'Tarjeta' : ''].filter(Boolean),
     shippingCents: shippingCost(),
     freeFrom: freeShippingThreshold(),
     contactEmail: process.env.CONTACT_EMAIL || '',

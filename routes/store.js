@@ -5,6 +5,7 @@ const { wrap } = require('../lib/security');
 const { TYPES, TYPE_LABELS, TYPE_PLURALS } = require('../lib/format');
 const { extrasOf } = require('../lib/productImages');
 const { variantsOf } = require('../lib/variants');
+const { sizeGuide } = require('../lib/formats');
 const themesLib = require('../lib/themes');
 const { trackStock } = require('../lib/orders');
 const { parseDetails, skuOf } = require('../lib/details');
@@ -151,6 +152,7 @@ router.get(
       product,
       productThemes,
       variants,
+      sizeGuide: sizeGuide(variants),
       related,
       gallery,
       details: parseDetails(product.details || '').details,
