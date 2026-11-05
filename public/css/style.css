@@ -304,7 +304,7 @@ input[aria-invalid='true'], select[aria-invalid='true'], textarea[aria-invalid='
 .cart-line { display: grid; grid-template-columns: 84px 1fr auto; gap: 16px; align-items: center; padding: 18px 0; border-bottom: 1px solid var(--border); }
 .cart-line:first-child { padding-top: 0; }
 .cart-line:last-child { border-bottom: 0; padding-bottom: 0; }
-.cart-line img { width: 84px; height: 84px; object-fit: cover; border-radius: 12px; border: 1px solid var(--border); }
+.cart-line img { width: 84px; height: 84px; object-fit: contain; padding: 6px; background: var(--matte); border-radius: var(--radius); }
 .cart-line h3 { margin: 0 0 2px; font-size: 1rem; }
 .cart-line .controls { display: flex; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
 .cart-line select { width: 84px; padding: 7px 10px; min-height: 38px; }
@@ -341,7 +341,7 @@ table.simple { width: 100%; border-collapse: collapse; min-width: 560px; }
 table.simple th, table.simple td { padding: 14px 16px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: middle; }
 table.simple tr:last-child td { border-bottom: 0; }
 table.simple th { font-size: .72rem; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); font-weight: 600; background: var(--bg-soft); }
-table.simple img.thumb-sm { width: 52px; height: 52px; object-fit: cover; border-radius: 10px; border: 1px solid var(--border); }
+table.simple img.thumb-sm { width: 52px; height: 52px; object-fit: contain; padding: 3px; background: var(--matte); border-radius: var(--radius); }
 .table-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .admin-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 26px; }
 .admin-top h1 { margin: 0; }
@@ -351,7 +351,7 @@ table.simple img.thumb-sm { width: 52px; height: 52px; object-fit: cover; border
 .stat span { color: var(--muted); font-size: .85rem; }
 .stat.alert { border-color: rgba(255, 193, 94, .5); }
 .form-card { max-width: 640px; }
-.preview { width: 140px; height: 140px; object-fit: cover; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 10px; }
+.preview { width: 140px; height: 140px; object-fit: contain; padding: 6px; background: var(--matte); border-radius: var(--radius); margin-bottom: 10px; }
 .kv { display: grid; grid-template-columns: 140px 1fr; gap: 8px 16px; margin: 0; }
 .kv dt { color: var(--muted); font-size: .88rem; }
 .kv dd { margin: 0; word-break: break-word; }
@@ -429,7 +429,7 @@ table.simple img.thumb-sm { width: 52px; height: 52px; object-fit: cover; border
 [hidden] { display: none !important; }
 fieldset.method-box { border: 1px solid var(--border-strong); border-radius: var(--radius-sm); padding: 14px 16px; margin: 0 0 16px; display: grid; gap: 10px; }
 fieldset.method-box legend { padding: 0 8px; font-size: .85rem; color: var(--muted); font-weight: 500; }
-.method-opt { cursor: pointer; padding: 10px 12px; border-radius: 10px; border: 1px solid transparent; }
+.method-opt { cursor: pointer; padding: 10px 12px; border-radius: var(--radius); border: 1px solid transparent; }
 .method-opt:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); color: var(--text); }
 .method-opt b { color: var(--text); }
 
@@ -444,7 +444,7 @@ fieldset.method-box legend { padding: 0 8px; font-size: .85rem; color: var(--mut
 .gallery-thumbs img { width: 100%; height: 100%; object-fit: contain; }
 .thumb-row { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
 .thumb-remove { display: grid; gap: 6px; width: 90px; margin: 0; }
-.thumb-remove img { width: 90px; height: 90px; object-fit: cover; border-radius: 10px; border: 1px solid var(--border); }
+.thumb-remove img { width: 90px; height: 90px; object-fit: contain; padding: 4px; background: var(--matte); border-radius: var(--radius); }
 .thumb-remove .check { font-size: .78rem; align-items: center; }
 .thumb-remove .check input { width: 15px; height: 15px; margin: 0; }
 @media (max-width: 900px) { .product-media { position: static; } }
@@ -577,4 +577,9 @@ dialog.lightbox .lb-close { position: fixed; top: 14px; right: 14px; width: 44px
   .filters input[type='search'] { width: 100%; flex: 1 1 100%; }
   .filters select { flex: 1; }
   .info-strip { margin-top: 0; }
+}
+.card, .card-body { min-width: 0; }
+.card-body h3 { overflow-wrap: anywhere; }
+@media (max-width: 560px) {
+  .card-line { flex-direction: column; gap: 2px; }
 }

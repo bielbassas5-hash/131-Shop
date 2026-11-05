@@ -13,8 +13,8 @@
     <section class="panel" aria-label="Artículos">
       <% cart.items.forEach((i) => { const max = shop.trackStock ? Math.min(i.stock, 10) : 10; %>
         <div class="cart-line">
-          <a href="<%= productUrl(i) %>">
-            <% if (i.image_path) { %><img src="<%= thumb(i.image_path, 200) %>" alt="<%= i.display %>" width="84" height="84" /><% } %>
+          <a href="<%= productUrl(i) %>" tabindex="-1" aria-hidden="true">
+            <% if (i.image_path) { %><img src="<%= thumb(i.image_path, 200) %>" alt="" width="84" height="84" /><% } %>
           </a>
           <div>
             <h3><a href="<%= productUrl(i) %>"><%= i.display %></a></h3>
