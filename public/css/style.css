@@ -647,13 +647,13 @@ dialog.lightbox .lb-nav:hover, dialog.lightbox .lb-close:hover { background: rgb
 }
 
 /* ---------- Logo propio (subido desde el panel) ---------- */
-.logo-img { display: block; height: 2.4rem; width: auto; max-width: 240px; }
+.logo-img { display: block; height: 3.2rem; width: auto; max-width: 260px; }
 .logo-on-dark { display: none; }
 :root[data-theme='dark'] .logo-on-dark { display: block; }
 :root[data-theme='dark'] .logo-on-light { display: none; }
 .logo-img.invert { filter: invert(1) hue-rotate(180deg); }
-.site-footer .logo-img { height: 3.4rem; max-width: 300px; }
-@media (max-width: 560px) { .logo-img { height: 2rem; } .site-footer .logo-img { height: 2.8rem; } }
+.site-footer .logo-img { height: 5rem; max-width: 320px; }
+@media (max-width: 560px) { .logo-img { height: 2.5rem; } .site-footer .logo-img { height: 4rem; } }
 .logo-preview { display: flex; align-items: center; justify-content: center; min-height: 110px; border-radius: var(--radius); padding: 18px; margin-bottom: 10px; }
 .logo-preview img { max-height: 80px; max-width: 100%; width: auto; }
 .logo-preview.on-light { background: #faf8f4; border: 1px solid var(--border); }

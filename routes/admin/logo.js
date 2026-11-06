@@ -4,6 +4,7 @@ const { requireAdmin } = require('../../middleware/auth');
 const { wrap } = require('../../lib/security');
 const { saveImage, deleteImage, detectImageType, UserError } = require('../../lib/imageStorage');
 const siteSettings = require('../../lib/siteSettings');
+const { trimLogo } = require('../../lib/logoTrim');
 const { uploadLogo } = require('./shared');
 
 const MAX_LOGO_BYTES = 2 * 1024 * 1024;
@@ -20,7 +21,9 @@ async function storeLogo(file) {
   const type = detectImageType(file.buffer);
   if (!type || !LOGO_TYPES.includes(type.mime)) throw new UserError('El logo debe ser un PNG (mejor con fondo transparente), WEBP o JPG.');
   if (file.buffer.length > MAX_LOGO_BYTES) throw new UserError('El logo supera los 2 MB.');
-  return saveImage(file);
+  // Se recortan los margenes vacios (un logo dibujado sobre un lienzo grande se veria pequeño y descentrado)
+  const trimmed = await trimLogo(file.buffer);
+  return saveImage(trimmed ? { ...file, buffer: trimmed.buffer } : file);
 }
 
 router.post(

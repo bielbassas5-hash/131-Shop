@@ -1207,6 +1207,15 @@ async function main() {
     check('el logo se ve en todas las paginas (carrito)', /logo-on-light/.test((await anon.get('/carrito')).text));
     check('reemplazar el logo borra el archivo anterior', (await logoPost({ light: png(2) })).status === 302 && countUploads() === uploadsBeforeLogo + 2);
     check('quitar el logo borra los archivos y vuelve al texto', (await admin.post('/admin/logo/quitar', { _csrf: tok })).status === 302 && countUploads() === uploadsBeforeLogo && /class="logo"[^>]*>131<i>\.<\/i>/.test((await anon.get('/')).text));
+    const { createCanvas: mkCanvas } = require('@napi-rs/canvas');
+    const marginLogo = () => { const c = mkCanvas(400, 200); const x = c.getContext('2d'); x.fillStyle = '#000'; x.fillRect(150, 75, 100, 50); return { data: c.toBuffer('image/png'), type: 'image/png', name: 'margenes.png' }; };
+    check('subir un logo dibujado sobre un lienzo con margenes', (await logoPost({ light: marginLogo() })).status === 302);
+    const trimmedSrc = ((await anon.get('/')).text.match(/class="logo-img logo-on-light" src="([^"]+)"/) || [])[1];
+    const trimmedBytes = Buffer.from(await (await fetch(BASE + trimmedSrc)).arrayBuffer());
+    check('los margenes vacios del logo se recortan al subirlo (100x50 + 3 px de aire = 106x56)', trimmedBytes.readUInt32BE(16) === 106 && trimmedBytes.readUInt32BE(20) === 56);
+    check('un logo totalmente vacio se guarda tal cual (sin recorte)', (await logoPost({ light: { data: (() => { const c = mkCanvas(50, 50); return c.toBuffer('image/png'); })(), type: 'image/png', name: 'vacio.png' } })).status === 302);
+    await admin.post('/admin/logo/quitar', { _csrf: tok });
+
 
     console.log('\n# Busqueda sin acentos, hoja de pedido, avisos del panel');
     const mkProd = (extra) => admin.req('POST', `/admin/productos/nuevo?_csrf=${tok}`, { multipart: productForm({ description: 'Tinta sobre papel', type: 'print', stock: '5', price: '9', ...extra }, png(0)) });
