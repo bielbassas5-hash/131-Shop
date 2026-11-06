@@ -67,22 +67,21 @@ const PNG = Buffer.from(
   'base64'
 );
 
-// PDF minimo valido (una pagina con un rectangulo y texto) para probar la conversion
-function makePdf({ w = 595, h = 842 } = {}) {
-  const content = `1 0.5 0 rg 60 60 ${w - 120} ${h - 200} re f\n0 g BT /F1 48 Tf 80 ${h - 100} Td (Hola 131) Tj ET`;
+// PDF minimo valido (una pagina con rectangulo y texto; opcionalmente una imagen incrustada) para probar la conversion
+function makePdf({ w = 595, h = 842, image = null } = {}) {
+  let content = `1 0.5 0 rg 60 60 ${w - 120} ${h - 200} re f\n0 g BT /F1 48 Tf 80 ${h - 100} Td (Hola 131) Tj ET`;
+  if (image) content += `\nq ${image.placed} 0 0 ${image.placed} 100 200 cm /Im1 Do Q`;
   const objs = [
     '<< /Type /Catalog /Pages 2 0 R >>',
     '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
-    `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${w} ${h}] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>`,
+    `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${w} ${h}] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >>${image ? ' /XObject << /Im1 6 0 R >>' : ''} >> >>`,
     `<< /Length ${content.length} >>\nstream\n${content}\nendstream`,
     '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
   ];
+  if (image) objs.push(`<< /Type /XObject /Subtype /Image /Width ${image.px} /Height ${image.px} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Length ${image.px * image.px * 3} >>\nstream\n${'\x80'.repeat(image.px * image.px * 3)}\nendstream`);
   let out = '%PDF-1.4\n';
   const offsets = [];
-  objs.forEach((o, i) => {
-    offsets.push(out.length);
-    out += `${i + 1} 0 obj\n${o}\nendobj\n`;
-  });
+  objs.forEach((o, i) => { offsets.push(out.length); out += `${i + 1} 0 obj\n${o}\nendobj\n`; });
   const xref = out.length;
   out += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n`;
   for (const o of offsets) out += String(o).padStart(10, '0') + ' 00000 n \n';
@@ -1214,6 +1213,27 @@ async function main() {
     check('el formulario anuncia que acepta PDF', /accept="[^"]*application\/pdf/.test(pdfEdit));
     check('un PDF tambien sirve como imagen adicional', (await admin.req('POST', `/admin/productos/${pdfId}/editar?_csrf=${tok}`, { multipart: productForm({ ...pfields, active: '1' }, null, [pdfFile('extra.pdf')]) })).status === 302 && /data-gallery-src/.test((await anon.get(`/producto/${pdfId}`)).text));
     check('eliminar el producto con PDF borra sus archivos', (await admin.post(`/admin/productos/${pdfId}/eliminar`, { _csrf: tok })).status === 302 && countUploads() === uploadsBefore);
+
+    console.log('\n# Resolucion de un PDF con imagenes incrustadas');
+    const rasterPdf = pdfFile('escaneo.pdf', makePdf({ image: { px: 100, placed: 400 } })); // 100 px sobre ~5,5 pulgadas = ~18 ppp
+    const rcreate = (extra, file) => admin.req('POST', `/admin/productos/nuevo?_csrf=${tok}`, { multipart: productForm({ ...pfields, title: 'PDF escaneado', fmt: ['A4'], fmt_price_A4: '18', ...extra }, file) });
+    check('un PDF con una imagen de baja resolucion se publica', (await rcreate({}, rasterPdf)).status === 302);
+    const rflash = (await admin.get('/admin')).text;
+    check('el aviso indica la resolucion estimada del PDF', /imágenes de unos 18 ppp a su tamaño de página/.test(rflash));
+    check('el aviso de calidad salta tambien con PDF (formato A4 en baja resolucion)', /Atención: resolución baja para A4 \(1[78] ppp\)/.test(rflash));
+    check('el panel marca el producto de PDF con resolucion baja', /Resolución baja: A4 \(1[78] ppp\)/.test(rflash));
+    const rId = (await anon.get('/?q=PDF%20escaneado')).text.match(/\/producto\/(\d+)-pdf-escaneado/)[1];
+    const redit = (await admin.get(`/admin/productos/${rId}/editar`)).text;
+    check('el formulario muestra la resolucion equivalente y la calidad del formato', /id="source_width"[^>]*value="149"/.test(redit) && /Resolución baja \(1[78] ppp\)/.test(redit));
+    check('un PDF vectorial posterior elimina el limite (campos vacios)', (await admin.req('POST', `/admin/productos/${rId}/editar?_csrf=${tok}`, { multipart: productForm({ ...pfields, title: 'PDF escaneado', active: '1', fmt: ['A4'], fmt_price_A4: '18' }, pdfFile('vector.pdf')) })).status === 302 && /id="source_width"[^>]*value=""/.test((await admin.get(`/admin/productos/${rId}/editar`)).text) && !/Resolución baja: A4 \(1[78] ppp\)/.test((await admin.get('/admin')).text));
+    const goodPdf = pdfFile('bueno.pdf', makePdf({ image: { px: 1500, placed: 400 } })); // ~270 ppp: aceptable
+    const goodRes = await rcreate({ title: 'PDF bueno' }, goodPdf);
+    const goodFlash = (await admin.get('/admin')).text;
+    check('un PDF de buena resolucion se publica sin aviso de calidad y con su resolucion estimada', goodRes.status === 302 && !/Atención: resolución baja/.test(goodFlash) && /unos 270 ppp/.test(goodFlash));
+    for (const t of ['PDF escaneado', 'PDF bueno']) {
+      const id = ((await anon.get(`/?q=${encodeURIComponent(t)}`)).text.match(/\/producto\/(\d+)-/) || [])[1];
+      if (id) await admin.post(`/admin/productos/${id}/eliminar`, { _csrf: tok });
+    }
 
     console.log('\n# Portada: obra destacada');
     const homeAll = (await anon.get('/')).text;

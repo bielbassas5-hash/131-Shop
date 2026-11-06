@@ -50,8 +50,13 @@ async function applyThemes(product, body, { buffer } = {}) {
 const describeDetection = (d) =>
   d && d.names.length ? ` Temas detectados ${d.source === 'ai' ? 'con IA' : 'por palabras clave'}: ${d.names.join(', ')}.` : '';
 
-const pdfNote = (files) =>
-  files.some((f) => f && f.fromPdf) ? ' El PDF se ha convertido a imagen para la web (página 1); la calidad de impresión depende de tu archivo original.' : '';
+// Aviso sobre los PDF: se convierten a imagen para la web y se estima su resolucion con las imagenes que contienen
+const pdfNote = (files) => {
+  const list = files.filter((f) => f && f.fromPdf);
+  if (!list.length) return '';
+  const parts = list.map((f) => (f.pdfPpp ? `imágenes de unos ${f.pdfPpp} ppp a su tamaño de página` : 'sin imágenes incrustadas (vectorial: sin límite de resolución)'));
+  return ` El PDF se ha convertido a imagen para la web (página 1): ${parts.join('; ')}.`;
+};
 
 const priceText = (cents) => (cents / 100).toFixed(2).replace('.', ',');
 
@@ -105,7 +110,7 @@ function readProduct(body) {
 
 // Resolucion del original: la que escribe el administrador (o rellena el navegador al elegir el archivo),
 // si no la detectada en el archivo subido, si no la que ya estaba guardada.
-function resolveDims(values, buffer, existing) {
+function resolveDims(values, buffer, existing, fromPdf) {
   const num = (x) => Number(x);
   const typed = formats.valid(num(values.source_width), num(values.source_height))
     ? { width: num(values.source_width), height: num(values.source_height) }
@@ -113,6 +118,8 @@ function resolveDims(values, buffer, existing) {
   const stored = existing && existing.source_width ? { width: num(existing.source_width), height: num(existing.source_height) } : null;
   const detected = buffer ? formats.imageSize(buffer) : null;
   const typedChanged = typed && (!stored || typed.width !== stored.width || typed.height !== stored.height);
+  // Un PDF decide por si mismo (aunque sea vectorial: null = sin limite) salvo que se corrija a mano
+  if (fromPdf && !typedChanged) return fromPdf.dims;
   return (typedChanged && typed) || detected || typed || stored || null;
 }
 
@@ -213,7 +220,7 @@ router.post(
       return renderForm(res, { form: { ...v.values, ...themeForm(req.body) }, errors: v.errors, error: err.message, status: 400 });
     }
 
-    const dims = resolveDims(v.values, cover.fromPdf ? null : cover.buffer, null);
+    const dims = resolveDims(v.values, cover.fromPdf ? null : cover.buffer, null, cover.fromPdf ? { dims: cover.pdfDims } : null);
     const created = await db.run(
       `INSERT INTO products (title, description, price_cents, image_path, type, stock, active, source_width, source_height, details)
        VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
@@ -286,7 +293,7 @@ router.post(
     }
 
     const image_path = coverPath || product.image_path;
-    const dims = resolveDims(v.values, cover && !cover.fromPdf ? cover.buffer : null, product);
+    const dims = resolveDims(v.values, cover && !cover.fromPdf ? cover.buffer : null, product, cover && cover.fromPdf ? { dims: cover.pdfDims } : null);
     await db.run(
       `UPDATE products SET title = ?, description = ?, price_cents = ?, image_path = ?, type = ?, stock = ?, active = ?,
          source_width = ?, source_height = ?, details = ?

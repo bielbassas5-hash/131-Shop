@@ -79,7 +79,7 @@ Si se rellenan, el cliente elige formato en la ficha, el listado muestra "Desde 
 
 ### Subir PDF
 
-El campo de imagen (portada y adicionales) acepta **PDF** además de PNG, JPG, WEBP y GIF. Se usa la primera página y se convierte a una imagen de hasta 2000 px para la web (con fondo blanco). Las imágenes admiten hasta 8 MB y los PDF hasta 20 MB (máximo 2 PDF por envío). La tienda no guarda el PDF: para imprimir sigues usando tu archivo original. Con un PDF no se puede medir la resolución, así que no se muestra la calidad por formato y marcas tú los formatos. Los PDF con contraseña o dañados se rechazan con un aviso.
+El campo de imagen (portada y adicionales) acepta **PDF** además de PNG, JPG, WEBP y GIF. Se usa la primera página y se convierte a una imagen de hasta 2000 px para la web (con fondo blanco). Las imágenes admiten hasta 8 MB y los PDF hasta 20 MB (máximo 2 PDF por envío). La tienda no guarda el PDF: para imprimir sigues usando tu archivo original. La resolución de un PDF se **estima con las imágenes que contiene**: se mide cuántos píxeles tiene cada imagen frente al tamaño que ocupa en la página (solo cuentan las que ocupan al menos un 5 % de la página) y se toma la más baja. Ese dato se guarda como el tamaño en píxeles equivalente, así que funcionan igual el aviso al guardar, la calidad por formato del formulario y la etiqueta "Resolución baja" del panel. Un PDF solo con trazos y texto (vectorial) no tiene límite de resolución y no genera avisos. Los PDF con contraseña o dañados se rechazan con un aviso.
 
 ### Ficha técnica y página "Sobre mí"
 

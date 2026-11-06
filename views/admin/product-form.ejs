@@ -93,7 +93,7 @@
     <% if (product && product.image_path) { %><img class="preview" src="<%= thumb(product.image_path, 300) %>" alt="Imagen actual" /><% } %>
     <img id="image-preview" class="preview" alt="Vista previa" hidden />
     <input id="image" type="file" name="image" accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,.pdf" data-preview <%= product ? '' : 'required' %> />
-    <p class="field-hint">PNG, JPG, WEBP, GIF o <b>PDF</b> (se usa la primera página). Imágenes hasta 8 MB y PDF hasta 20 MB. Con un PDF la web guarda una versión de 2000 px; tu archivo original sigue siendo el que usas para imprimir, y la calidad por formato no se puede medir (marca los formatos tú).</p>
+    <p class="field-hint">PNG, JPG, WEBP, GIF o <b>PDF</b> (se usa la primera página). Imágenes hasta 8 MB y PDF hasta 20 MB. Con un PDF la web guarda una versión de 2000 px y tu archivo original sigue siendo el que usas para imprimir. Su resolución se estima con las imágenes que contiene (un PDF solo con trazos vectoriales no tiene límite) y se muestra como la equivalente en píxeles.</p>
   </div>
   <div class="field">
     <label for="extra">Imágenes adicionales (opcional, hasta <%= maxExtras %>)</label>
