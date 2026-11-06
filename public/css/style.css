@@ -620,3 +620,28 @@ dialog.lightbox .lb-nav:hover, dialog.lightbox .lb-close:hover { background: rgb
 
 .format-group { margin: 14px 0 2px; font-size: .72rem; text-transform: uppercase; letter-spacing: .12em; font-weight: 600; color: var(--muted); }
 .format-group:first-child { margin-top: 0; }
+
+.chips-center { justify-content: center; }
+
+/* ---------- Hoja de pedido (pantalla e impresion) ---------- */
+.sheet { max-width: 780px; margin: 0 auto; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 36px 40px; }
+.sheet-head { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; flex-wrap: wrap; border-bottom: 2px solid var(--text); padding-bottom: 12px; margin-bottom: 24px; }
+.sheet-head h1 { margin: 0; font-size: 2rem; }
+.sheet h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .14em; color: var(--muted); margin: 28px 0 10px; }
+.sheet table { width: 100%; border-collapse: collapse; }
+.sheet th, .sheet td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.sheet th { font-size: .75rem; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); }
+.sheet td.qty { width: 70px; font-weight: 700; font-size: 1.15rem; }
+.sheet .ref { color: var(--muted); font-size: .8rem; }
+.sheet-note { border: 1px dashed var(--border-strong); border-radius: var(--radius); padding: 10px 14px; margin-top: 14px; white-space: pre-line; }
+.label-box { border: 2px solid var(--text); border-radius: var(--radius); padding: 18px 22px; font-size: 1.25rem; line-height: 1.5; }
+.label-box b { font-size: 1.5rem; }
+.label-from { margin-top: 10px; font-size: .82rem; color: var(--muted); }
+.print-bar { max-width: 780px; margin: 0 auto 18px; display: flex; gap: 10px; flex-wrap: wrap; }
+@media print {
+  main { padding: 0; }
+  .print-bar { display: none !important; }
+  .sheet { border: 0; padding: 0; max-width: none; background: #fff; color: #000; }
+  .sheet h2, .sheet th, .sheet .ref, .label-from { color: #333; }
+  .label-box { border-color: #000; }
+}

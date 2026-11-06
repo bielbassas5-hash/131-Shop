@@ -1,0 +1,46 @@
+<%- include('../partials/header') %>
+
+<div class="print-bar">
+  <button class="btn" type="button" data-print>Imprimir</button>
+  <a class="btn ghost" href="/admin/pedidos/<%= order.id %>">Volver al pedido</a>
+</div>
+
+<article class="sheet">
+  <div class="sheet-head">
+    <h1>Pedido #<%= order.id %></h1>
+    <span><%= dateTime(order.created_at) %> · <%= STATUS_LABELS[order.status] || order.status %></span>
+  </div>
+
+  <h2>Para preparar</h2>
+  <table>
+    <thead><tr><th>Cant.</th><th>Artículo y formato</th></tr></thead>
+    <tbody>
+      <% items.forEach((i) => { %>
+        <tr>
+          <td class="qty"><%= i.quantity %></td>
+          <td><%= i.title %><% if (i.product_id) { %><br /><span class="ref">Ref. <%= skuOf(i.product_id) %></span><% } %></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+  <% if (shipTo.notes) { %><div class="sheet-note"><b>Nota del cliente:</b> <%= shipTo.notes %></div><% } %>
+  <% if (order.admin_notes) { %><div class="sheet-note"><b>Nota interna:</b> <%= order.admin_notes %></div><% } %>
+
+  <% if (order.shipping_method === 'pickup') { %>
+    <h2>Recogida en mano</h2>
+    <div class="label-box"><b><%= shipTo.name || order.customer_name %></b><br /><%= shipTo.phone || shipTo.email || order.customer_email %></div>
+  <% } else { %>
+    <h2>Etiqueta de envío</h2>
+    <div class="label-box">
+      <b><%= shipTo.name || order.customer_name %></b><br />
+      <%= shipTo.address %><br />
+      <%= shipTo.postal_code %> <%= shipTo.city %><br />
+      <%= shipTo.country %><% if (shipTo.phone) { %><br />Tel. <%= shipTo.phone %><% } %>
+    </div>
+    <% if (shop.legalName || shop.legalAddress) { %>
+      <p class="label-from">Remitente: <%= [shop.legalName, shop.legalAddress].filter(Boolean).join(' · ') %></p>
+    <% } %>
+  <% } %>
+</article>
+
+<%- include('../partials/footer') %>

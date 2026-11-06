@@ -7,6 +7,7 @@ const { paymentInfo, trackStock } = require('../../lib/orders');
 const { stripeConfigured } = require('../../lib/payments');
 const classify = require('../../lib/classify');
 const { configured: mailConfigured } = require('../../lib/mailer');
+const formats = require('../../lib/formats');
 const { isWeak } = require('./shared');
 
 const router = express.Router();
@@ -48,8 +49,29 @@ router.get(
       soldOut: trackStock() ? products.filter((p) => p.active && p.stock <= 0).length : 0,
       lowStock: trackStock() ? products.filter((p) => p.active && p.stock > 0 && p.stock <= 2).length : 0,
     };
+    // Formatos activados cuya resolucion no llega (solo si se conoce el tamano del original)
+    const byId = new Map(products.map((p) => [Number(p.id), p]));
+    const lowQuality = {};
+    for (const v of await db.all('SELECT product_id, label FROM product_variants')) {
+      const preset = formats.presetOfLabel(v.label);
+      const prod = byId.get(Number(v.product_id));
+      if (!preset || !prod || !prod.source_width) continue;
+      const a = formats.assess({ width: Number(prod.source_width), height: Number(prod.source_height) }, preset);
+      if (a && a.level === 'baja') (lowQuality[prod.id] = lowQuality[prod.id] || []).push(`${preset.id} (${a.ppp} ppp)`);
+    }
+
+    // Recordatorio de copia de seguridad: nunca hecha o de hace mas de 30 dias (si ya hay datos que perder)
+    const last = await db.get("SELECT value FROM settings WHERE key = 'last_backup'");
+    const lastMs = last && Date.parse(last.value);
+    const backupDays = lastMs ? Math.floor((Date.now() - lastMs) / 86400000) : null;
+    const hasData = products.length > 0 || counts.length > 0;
+    const backupDue = hasData && (backupDays === null || backupDays > 30);
+
     res.render('admin/dashboard', {
       products,
+      lowQuality,
+      backupDue,
+      backupDays,
       stats,
       weakPassword: isWeak(),
       checklist: launchChecklist(),
@@ -60,6 +82,7 @@ router.get(
 
 // Copia de seguridad completa: catalogo, temas y pedidos (contiene datos personales: guardala en sitio seguro)
 const BACKUP_TABLES = ['products', 'product_images', 'product_variants', 'themes', 'product_themes', 'orders', 'order_items', 'order_events'];
+const BACKUP_SETTINGS_SKIP = ['last_login']; // la IP del ultimo acceso no hace falta en la copia
 
 router.get(
   '/admin/copia-seguridad.json',
@@ -67,6 +90,8 @@ router.get(
   wrap(async (req, res) => {
     const data = { generado: new Date().toISOString(), version: 1 };
     for (const table of BACKUP_TABLES) data[table] = await db.all(`SELECT * FROM ${table}`);
+    data.settings = (await db.all('SELECT key, value FROM settings')).filter((s) => !BACKUP_SETTINGS_SKIP.includes(s.key));
+    await db.run("INSERT OR REPLACE INTO settings (key, value) VALUES ('last_backup', ?)", [data.generado]);
     res.set('Content-Type', 'application/json; charset=utf-8');
     res.set('Content-Disposition', `attachment; filename="copia-131-${data.generado.slice(0, 10)}.json"`);
     res.send(JSON.stringify(data, null, 2));

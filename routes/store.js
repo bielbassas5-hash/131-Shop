@@ -28,6 +28,14 @@ const hoverImage = (alias) =>
   `(SELECT x.image_path FROM product_images x WHERE x.product_id = ${alias}.id ORDER BY x.position, x.id LIMIT 1) AS hover_image,
    (SELECT COUNT(*) FROM product_variants v WHERE v.product_id = ${alias}.id) AS variant_count`;
 
+// Sin acentos ni mayusculas
+const plain = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+// Todas las palabras buscadas deben aparecer en alguno de los campos
+const matchesSearch = (q, fields) => {
+  const hay = plain(fields.join(' '));
+  return plain(q).split(/\s+/).filter(Boolean).every((w) => hay.includes(w));
+};
+
 // Catalogo con filtros. `theme` (opcional) agrupa solo los productos de ese tema.
 async function renderCatalog(req, res, theme) {
   const tipo = TYPES.includes(req.query.tipo) ? req.query.tipo : '';
@@ -44,20 +52,23 @@ async function renderCatalog(req, res, theme) {
     where.push('type = ?');
     args.push(tipo);
   }
-  if (q) {
-    where.push("(title LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\')");
-    const like = `%${q.replace(/[\\%_]/g, '\\$&')}%`;
-    args.push(like, like);
-  }
-
-  const [products, themes] = await Promise.all([
+  // La busqueda se hace aqui y no en SQL: ignora acentos y mayusculas ("montana" encuentra "Montaña")
+  // y tambien mira los temas del producto.
+  const [found, themes] = await Promise.all([
     db.all(
     `SELECT products.*, ${hoverImage('products')} FROM products WHERE ${where.join(' AND ')}
-     ORDER BY ${trackStock() ? '(stock > 0) DESC,' : ''} ${SORTS[orden]} LIMIT 120`,
+     ORDER BY ${trackStock() ? '(stock > 0) DESC,' : ''} ${SORTS[orden]} LIMIT ${q ? 500 : 120}`,
     args
     ),
     themesLib.publicThemes(),
   ]);
+  let products = found;
+  if (q) {
+    const rows = await db.all('SELECT pt.product_id AS id, t.name FROM product_themes pt JOIN themes t ON t.id = pt.theme_id');
+    const themeNames = new Map();
+    for (const r of rows) themeNames.set(Number(r.id), `${themeNames.get(Number(r.id)) || ''} ${r.name}`);
+    products = found.filter((p) => matchesSearch(q, [p.title, p.description, themeNames.get(Number(p.id))])).slice(0, 120);
+  }
 
   // Portada sin filtros: la obra mas reciente se muestra grande y el resto va en la cuadricula
   const featured = !theme && !tipo && !q && orden === 'nuevo' && products.length >= 5 && products[0].image_path ? products[0] : null;

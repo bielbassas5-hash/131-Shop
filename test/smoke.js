@@ -1138,6 +1138,36 @@ async function main() {
     const alerts = mailTo('owner@example.com', /Intentos fallidos de acceso/);
     check('aviso por email tras varios intentos fallidos (solo uno por hora)', alerts.length === 1 && /IP 127\.0\.0\.1|IP ::1|IP ::ffff:127\.0\.0\.1/.test(alerts[0].textContent), String(alerts.length));
 
+    console.log('\n# Busqueda sin acentos, hoja de pedido, avisos del panel');
+    const mkProd = (extra) => admin.req('POST', `/admin/productos/nuevo?_csrf=${tok}`, { multipart: productForm({ description: 'Tinta sobre papel', type: 'print', stock: '5', price: '9', ...extra }, png(0)) });
+    check('producto de prueba para la busqueda', (await mkProd({ title: 'Montaña nevada', new_themes: 'Acuarela' })).status === 302);
+    const hasTitle = async (qs) => (await anon.get(`/?q=${encodeURIComponent(qs)}`)).text.includes('Montaña nevada');
+    check('la busqueda ignora acentos (montana)', await hasTitle('montana'));
+    check('la busqueda ignora mayusculas y acentos (MONTAÑA)', await hasTitle('MONTAÑA'));
+    check('varias palabras: todas deben aparecer', (await hasTitle('nevada montana')) && !(await hasTitle('nevada desierto')));
+    check('la busqueda tambien mira los temas (acuarela)', await hasTitle('acuarela'));
+    check('el comodin % no es un patron (busqueda literal)', !(await hasTitle('%')));
+    check('sin resultados se sugieren temas', /O explora por tema/.test((await anon.get('/?q=zzzzqqq')).text));
+
+    check('la hoja de pedido exige sesion', (await anon.get('/admin/pedidos/1/imprimir')).status === 302);
+    const sheet = await admin.get('/admin/pedidos/1/imprimir');
+    check('la hoja de pedido muestra articulos y etiqueta de envio o recogida', sheet.status === 200 && /Para preparar/.test(sheet.text) && /Etiqueta de envío|Recogida en mano/.test(sheet.text) && /data-print/.test(sheet.text));
+    check('la hoja de un pedido inexistente o con id raro da 404', (await admin.get('/admin/pedidos/99999/imprimir')).status === 404 && (await admin.get('/admin/pedidos/abc/imprimir')).status === 404);
+    check('el detalle del pedido enlaza la hoja', (await admin.get('/admin/pedidos/1')).text.includes('/admin/pedidos/1/imprimir'));
+
+    check('producto con resolucion baja para un formato', (await mkProd({ title: 'Baja resolucion', price: '', fmt: ['A4'], fmt_price_A4: '15', source_width: '1000', source_height: '1400' })).status === 302);
+    check('el panel marca los formatos con resolucion baja', /Resolución baja: A4 \(119 ppp\)/.test((await admin.get('/admin')).text));
+
+    const backupResp = await admin.get('/admin/copia-seguridad.json');
+    const backupJson = JSON.parse(backupResp.text);
+    check('la copia incluye los ajustes (sin la IP del ultimo acceso)', Array.isArray(backupJson.settings) && !backupJson.settings.some((s) => s.key === 'last_login') && backupJson.products.length > 0);
+    check('tras descargar la copia desaparece el recordatorio', !/Descargar copia ahora/.test((await admin.get('/admin')).text));
+    check('las preguntas frecuentes listan los tamaños (incluidos stickers)', /¿Qué tamaños hay\?/.test((await anon.get('/preguntas-frecuentes')).text) && (await anon.get('/preguntas-frecuentes')).text.includes('4 × 4 cm'));
+    for (const t of ['Montaña nevada', 'Baja resolucion']) {
+      const id = ((await anon.get(`/?q=${encodeURIComponent(t)}`)).text.match(/\/producto\/(\d+)-/) || [])[1];
+      if (id) await admin.post(`/admin/productos/${id}/eliminar`, { _csrf: tok });
+    }
+
     console.log('\n# Formatos de sticker (4x4 y 5x5 cm)');
     check('hay presets de sticker ademas de la serie A', fmtLib.PRESETS.filter((p) => p.group === 'sticker').map((p) => p.id).join() === '4x4,5x5' && fmtLib.PRESETS[0].id === 'A5');
     check('un sticker de 1000 px da calidad optima en 5x5 cm', fmtLib.assess({ width: 1000, height: 1000 }, fmtLib.PRESETS.find((p) => p.id === '5x5')).level === 'optima');

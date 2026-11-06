@@ -73,6 +73,9 @@
       <button class="btn secondary block" type="submit">Guardar nota</button>
     </form>
     <hr />
+    <a class="btn secondary block" href="/admin/pedidos/<%= order.id %>/imprimir">Hoja para preparar el pedido</a>
+    <p class="field-hint">Artículos con su formato y etiqueta de envío, lista para imprimir.</p>
+    <hr />
     <a class="btn secondary block" href="<%= mailto %>">Avisar al cliente por email</a>
     <p class="field-hint">Abre tu correo con el mensaje y el enlace de seguimiento ya preparados.</p>
     <p class="field-hint">Enlace del cliente: <a class="link" href="<%= publicLink %>" target="_blank" rel="noopener">ver pedido</a></p>

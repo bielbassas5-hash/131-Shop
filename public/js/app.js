@@ -30,6 +30,22 @@
     }
   });
 
+  // Imprimir la pagina: <button data-print>
+  document.addEventListener('click', function (e) {
+    if (e.target.closest && e.target.closest('[data-print]')) window.print();
+  });
+
+  // Atajo: "/" lleva al buscador del catalogo
+  document.addEventListener('keydown', function (e) {
+    var t = e.target;
+    var typing = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable);
+    var box = document.getElementById('q');
+    if (e.key === '/' && !typing && !e.ctrlKey && !e.metaKey && !e.altKey && box) {
+      e.preventDefault();
+      box.focus();
+    }
+  });
+
   // Cerrar avisos
   document.addEventListener('click', function (e) {
     var close = e.target.closest && e.target.closest('[data-dismiss]');

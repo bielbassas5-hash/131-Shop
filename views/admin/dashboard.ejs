@@ -35,6 +35,10 @@
   </section>
 <% } %>
 
+<% if (backupDue) { %>
+  <div class="flash warn" role="status"><div class="flash-body"><%= backupDays === null ? 'Todavía no has hecho ninguna copia de seguridad.' : 'Tu última copia de seguridad es de hace ' + backupDays + ' días.' %> <a href="/admin/copia-seguridad.json" download>Descargar copia ahora</a> y guárdala en un sitio seguro.</div></div>
+<% } %>
+
 <div class="stats">
   <div class="stat"><b><%= euro(stats.revenue) %></b><span>Ingresos confirmados</span></div>
   <a class="stat<%= stats.pending ? ' alert' : '' %>" href="/admin/pedidos?estado=pending"><b><%= stats.pending %></b><span>Pedidos pendientes de pago</span></a>
@@ -56,7 +60,8 @@
         <% products.forEach((p) => { %>
           <tr>
             <td><% if (p.image_path) { %><img class="thumb-sm" src="<%= thumb(p.image_path, 120) %>" alt="" width="52" height="52" /><% } %></td>
-            <td><a class="link" href="/producto/<%= p.id %>"><%= p.title %></a></td>
+            <td><a class="link" href="/producto/<%= p.id %>"><%= p.title %></a>
+              <% if (lowQuality[p.id]) { %><br /><span class="badge pending" title="La resolución del original no llega para estos formatos">Resolución baja: <%= lowQuality[p.id].join(', ') %></span><% } %></td>
             <td><%= TYPE_LABELS[p.type] || p.type %></td>
             <td><%= Number(p.variant_count) > 0 ? 'Desde ' : '' %><%= euro(p.price_cents) %></td>
             <% if (shop.trackStock) { %><td><%= p.stock %><% if (p.active && p.stock <= 0) { %> <span class="badge cancelled">Agotado</span><% } %></td><% } %>

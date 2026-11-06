@@ -8,6 +8,7 @@ const { text, multiline } = require('../../lib/validate');
 const { STATUSES, setStatus, orderEvents, StockError } = require('../../lib/orders');
 const { STATUS_LABELS } = require('../../lib/format');
 const notify = require('../../lib/notify');
+const { skuOf } = require('../../lib/details');
 const { configured: mailConfigured } = require('../../lib/mailer');
 
 const router = express.Router();
@@ -120,6 +121,25 @@ router.get(
       mailConfigured: mailConfigured(),
       meta: { title: `Pedido #${order.id}`, noindex: true },
     });
+  })
+);
+
+// Hoja para preparar el pedido: lo que hay que elaborar y la etiqueta de envio (se imprime desde el navegador)
+router.get(
+  '/admin/pedidos/:id/imprimir',
+  requireAdmin,
+  wrap(async (req, res) => {
+    if (!/^\d+$/.test(req.params.id)) return res.status(404).render('error', { status: 404 });
+    const order = await db.get('SELECT * FROM orders WHERE id = ?', [req.params.id]);
+    if (!order) return res.status(404).render('error', { status: 404 });
+    const items = await db.all('SELECT * FROM order_items WHERE order_id = ?', [order.id]);
+    let shipTo = {};
+    try {
+      shipTo = JSON.parse(order.shipping_address || '{}');
+    } catch (_) {
+      /* sin datos */
+    }
+    res.render('admin/order-print', { order, items, shipTo, skuOf, meta: { title: `Hoja del pedido #${order.id}`, noindex: true } });
   })
 );
 

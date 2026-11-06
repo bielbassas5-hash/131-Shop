@@ -76,6 +76,12 @@
       <% if (filtered) { %>
         <p>No hay resultados con esos filtros.</p>
         <a class="btn secondary" href="/">Quitar filtros</a>
+        <% if (themes.length) { %>
+          <p class="mt20 muted">O explora por tema:</p>
+          <div class="chips chips-center">
+            <% themes.forEach((t) => { %><a class="chip" href="/tema/<%= t.slug %>"><%= t.name %></a><% }) %>
+          </div>
+        <% } %>
       <% } else { %>
         <p>No hay productos disponibles ahora mismo.</p>
       <% } %>
