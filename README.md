@@ -77,6 +77,12 @@ A2: 45,00
 
 Si se rellenan, el cliente elige formato en la ficha, el listado muestra "Desde 18,00 €" y el carrito y el pedido guardan el formato elegido ("Ojo de tigre · A3") con su precio, que siempre se recalcula en el servidor. Si quitas los formatos, el producto vuelve a su precio normal y los carritos que tuvieran un formato retirado se limpian solos.
 
+### Portada y logo
+
+**Obra de portada.** En el formulario de cada producto hay una casilla "Mostrar en la portada": esa obra se ve grande en la página de inicio (solo una a la vez; al marcar otra sustituye a la anterior). El panel la señala con la etiqueta "Portada". Si no eliges ninguna (o la elegida está oculta o borrada), se usa la última añadida cuando hay al menos 5 productos. Con filtros o búsqueda no se muestra.
+
+**Logo propio.** Panel → Logo: sube un PNG (mejor transparente), WEBP o JPG de hasta 2 MB para fondo claro y, opcionalmente, otra versión para fondo oscuro (pie y tema oscuro). Sin la versión oscura se invierten los colores de la clara. No se admite SVG a propósito, porque puede llevar scripts. "Quitar logo" vuelve al texto "131.".
+
 ### Subir PDF
 
 El campo de imagen (portada y adicionales) acepta **PDF** además de PNG, JPG, WEBP y GIF. Se usa la primera página y se convierte a una imagen de hasta 2000 px para la web (con fondo blanco). Las imágenes admiten hasta 8 MB y los PDF hasta 20 MB (máximo 2 PDF por envío). La tienda no guarda el PDF: para imprimir sigues usando tu archivo original. La resolución de un PDF se **estima con las imágenes que contiene**: se mide cuántos píxeles tiene cada imagen frente al tamaño que ocupa en la página (solo cuentan las que ocupan al menos un 5 % de la página) y se toma la más baja. Ese dato se guarda como el tamaño en píxeles equivalente, así que funcionan igual el aviso al guardar, la calidad por formato del formulario y la etiqueta "Resolución baja" del panel. Un PDF solo con trazos y texto (vectorial) no tiene límite de resolución y no genera avisos. Los PDF con contraseña o dañados se rechazan con un aviso.

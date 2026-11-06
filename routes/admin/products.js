@@ -11,6 +11,7 @@ const { parseDetails, toText: toDetailsText, MAX_DETAILS } = require('../../lib/
 const formats = require('../../lib/formats');
 const themesLib = require('../../lib/themes');
 const classify = require('../../lib/classify');
+const siteSettings = require('../../lib/siteSettings');
 const { uploadImages, pickFiles } = require('./shared');
 
 const router = express.Router();
@@ -90,6 +91,7 @@ function readProduct(body) {
 
   const v = validateProduct(body, { hasVariants: variants.length > 0 });
   v.values.variants_text = typeof body.variants_text === 'string' ? body.variants_text.slice(0, 700) : '';
+  v.values.featured = body.featured === '1';
   v.values.fmt = chosen.filter((id) => formats.PRESETS.some((p) => p.id === id));
   v.values.fmt_prices = fmtPrices;
   const det = parseDetails(body.details);
@@ -185,6 +187,7 @@ async function renderForm(res, { product = null, form = null, errors = {}, error
     variantsText,
     formatRows,
     dims,
+    isFeatured: form ? !!form.featured : !!product && siteSettings.getFeaturedId() === Number(product.id),
     maxVariants: MAX_VARIANTS,
     groupLabels: formats.GROUP_LABELS,
     maxDetails: MAX_DETAILS,
@@ -226,6 +229,7 @@ router.post(
        VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
       [v.values.title, v.values.description, v.price_cents, coverPath, v.values.type, v.stock, dims ? dims.width : null, dims ? dims.height : null, v.details_text]
     );
+    if (v.values.featured) await siteSettings.setFeaturedId(Number(created.lastInsertRowid));
     await addExtras(created.lastInsertRowid, extraPaths);
     if (variants.length) await replaceVariants(created.lastInsertRowid, variants);
     const detection = await applyThemes(
@@ -300,6 +304,8 @@ router.post(
        WHERE id = ?`,
       [v.values.title, v.values.description, v.price_cents, image_path, v.values.type, v.stock, active ? 1 : 0, dims ? dims.width : null, dims ? dims.height : null, v.details_text, product.id]
     );
+    if (v.values.featured) await siteSettings.setFeaturedId(Number(product.id));
+    else if (siteSettings.getFeaturedId() === Number(product.id)) await siteSettings.setFeaturedId(0);
     if (coverPath) await deleteImage(product.image_path);
     await removeExtras(product.id, removeIds);
     await addExtras(product.id, extraPaths);
@@ -320,6 +326,7 @@ router.post(
   wrap(async (req, res) => {
     const product = await findProduct(req);
     if (product) {
+      if (siteSettings.getFeaturedId() === Number(product.id)) await siteSettings.setFeaturedId(0);
       await removeAllExtras(product.id);
       await db.run('DELETE FROM product_variants WHERE product_id = ?', [product.id]);
       await db.run('DELETE FROM products WHERE id = ?', [product.id]);

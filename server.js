@@ -122,6 +122,7 @@ app.use((req, res, next) => {
   res.locals.currentPath = req.path;
   res.locals.meta = {};
   res.locals.hasAbout = !!siteSettings.getAbout();
+  res.locals.logo = siteSettings.getLogo();
   res.locals.isAdmin = !!(req.session && req.session.isAdmin);
   const pay = paymentInfo();
   res.locals.shop = {

@@ -1137,6 +1137,55 @@ async function main() {
     const alerts = mailTo('owner@example.com', /Intentos fallidos de acceso/);
     check('aviso por email tras varios intentos fallidos (solo uno por hora)', alerts.length === 1 && /IP 127\.0\.0\.1|IP ::1|IP ::ffff:127\.0\.0\.1/.test(alerts[0].textContent), String(alerts.length));
 
+    console.log('\n# Obra de portada elegida');
+    const fcreate2 = (extra) => admin.req('POST', `/admin/productos/nuevo?_csrf=${tok}`, { multipart: productForm({ description: 'Pieza de portada', type: 'print', stock: '5', price: '11', ...extra }, png(0)) });
+    const featTitle = async () => ((await anon.get('/')).text.match(/class="feature-body">[\s\S]*?<h2><a href="[^"]*">([^<]*)</) || [])[1];
+    check('la casilla de portada aparece en el formulario de alta', /name="featured" value="1"/.test((await admin.get('/admin/productos/nuevo')).text));
+    check('un producto marcado como portada se publica', (await fcreate2({ title: 'Portada Uno', featured: '1' })).status === 302);
+    check('la portada muestra la obra elegida (aunque no sea la ultima)', (await featTitle()) === 'Portada Uno');
+    check('una obra posterior sin marcar no la desplaza', (await fcreate2({ title: 'Portada Dos' })).status === 302 && (await featTitle()) === 'Portada Uno');
+    const p1 = (await anon.get('/?q=Portada%20Uno')).text.match(/\/producto\/(\d+)-portada-uno/)[1];
+    const p2 = (await anon.get('/?q=Portada%20Dos')).text.match(/\/producto\/(\d+)-portada-dos/)[1];
+    check('la obra elegida no se repite en la cuadricula', !(await anon.get('/')).text.split('class="catalog-head"')[1].includes(`/producto/${p1}-`));
+    check('el panel marca la obra de portada', /Portada Uno<\/a> <span class="badge paid"[^>]*>Portada</.test((await admin.get('/admin')).text));
+    check('el formulario de edicion recuerda la portada', /name="featured" value="1" checked/.test((await admin.get(`/admin/productos/${p1}/editar`)).text) && !/name="featured" value="1" checked/.test((await admin.get(`/admin/productos/${p2}/editar`)).text));
+    const edit2 = (extra) => admin.req('POST', `/admin/productos/${p2}/editar?_csrf=${tok}`, { multipart: productForm({ title: 'Portada Dos', description: 'x', type: 'print', stock: '5', price: '11', active: '1', ...extra }) });
+    check('elegir otra obra sustituye a la anterior', (await edit2({ featured: '1' })).status === 302 && (await featTitle()) === 'Portada Dos');
+    check('quitar la marca vuelve a la obra mas reciente', (await edit2({})).status === 302 && (await featTitle()) !== 'Portada Dos');
+    check('una obra de portada oculta no se muestra (se usa la mas reciente)', (await edit2({ featured: '1' })).status === 302 && (await edit2({ featured: '1', active: '' })).status === 302 && !/Portada Dos/.test(((await anon.get('/')).text.match(/class="feature-body">[\s\S]*?<\/h2>/) || [''])[0]));
+    check('con filtros no hay portada elegida', !/<section class="feature"/.test((await anon.get('/?tipo=print')).text));
+    check('borrar la obra de portada limpia la eleccion', (await admin.post(`/admin/productos/${p2}/eliminar`, { _csrf: tok })).status === 302 && (await featTitle()) !== undefined);
+    await admin.post(`/admin/productos/${p1}/eliminar`, { _csrf: tok });
+
+    console.log('\n# Logo propio');
+    const uploadsBeforeLogo = countUploads();
+    const logoPost = (files) => {
+      const fd = new FormData();
+      for (const [k, f] of Object.entries(files)) fd.append(k, new Blob([f.data], { type: f.type }), f.name);
+      return admin.req('POST', `/admin/logo?_csrf=${tok}`, { multipart: fd });
+    };
+    check('la pagina de logo exige sesion', (await anon.get('/admin/logo')).status === 302 && (await anon.post('/admin/logo', { x: 1 })).status === 403);
+    check('sin logo propio se muestra el texto', /class="logo"[^>]*>131<i>\.<\/i>/.test((await anon.get('/')).text));
+    check('un SVG se rechaza (puede llevar scripts)', (await logoPost({ light: { data: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'), type: 'image/svg+xml', name: 'l.svg' } })).status === 400);
+    check('un archivo que no es imagen se rechaza', (await logoPost({ light: { data: Buffer.from('texto cualquiera de prueba'), type: 'image/png', name: 'l.png' } })).status === 400);
+    check('un GIF se rechaza (solo PNG, WEBP o JPG)', (await logoPost({ light: { data: Buffer.concat([Buffer.from('GIF89a'), Buffer.alloc(40)]), type: 'image/gif', name: 'l.gif' } })).status === 400);
+    check('un logo de mas de 2 MB se rechaza', (await logoPost({ light: { data: Buffer.concat([png(0).data, Buffer.alloc(3 * 1024 * 1024)]), type: 'image/png', name: 'grande.png' } })).status === 400);
+    check('la version oscura sola (sin la clara) se rechaza', (await logoPost({ dark: png(0) })).status === 400);
+    check('los rechazos no dejan archivos huerfanos', countUploads() === uploadsBeforeLogo);
+    check('subir el logo claro', (await logoPost({ light: png(0) })).status === 302);
+    const homeLogo = (await anon.get('/')).text;
+    const lightSrc = (homeLogo.match(/class="logo-img logo-on-light" src="([^"]+)"/) || [])[1];
+    check('la cabecera usa el logo subido (con version oscura invertida si no hay otra)', !!lightSrc && /logo-on-dark invert/.test(homeLogo) && !/class="logo"[^>]*>131<i>/.test(homeLogo));
+    check('el pie usa el logo (invertido, sin version oscura)', /class="logo-img invert" src="[^"]+"/.test(homeLogo));
+    check('el logo se sirve como imagen real', (await fetch(BASE + lightSrc)).headers.get('content-type') === 'image/png');
+    check('subir la version oscura', (await logoPost({ dark: png(1) })).status === 302);
+    const homeLogo2 = (await anon.get('/')).text;
+    const darkSrc = (homeLogo2.match(/class="logo-img logo-on-dark" src="([^"]+)"/) || [])[1];
+    check('con version oscura propia ya no se invierte', !!darkSrc && darkSrc !== lightSrc && !/logo-on-dark invert/.test(homeLogo2) && new RegExp(`class="logo-img" src="${darkSrc}"`).test(homeLogo2));
+    check('el logo se ve en todas las paginas (carrito)', /logo-on-light/.test((await anon.get('/carrito')).text));
+    check('reemplazar el logo borra el archivo anterior', (await logoPost({ light: png(2) })).status === 302 && countUploads() === uploadsBeforeLogo + 2);
+    check('quitar el logo borra los archivos y vuelve al texto', (await admin.post('/admin/logo/quitar', { _csrf: tok })).status === 302 && countUploads() === uploadsBeforeLogo && /class="logo"[^>]*>131<i>\.<\/i>/.test((await anon.get('/')).text));
+
     console.log('\n# Busqueda sin acentos, hoja de pedido, avisos del panel');
     const mkProd = (extra) => admin.req('POST', `/admin/productos/nuevo?_csrf=${tok}`, { multipart: productForm({ description: 'Tinta sobre papel', type: 'print', stock: '5', price: '9', ...extra }, png(0)) });
     check('producto de prueba para la busqueda', (await mkProd({ title: 'Montaña nevada', new_themes: 'Acuarela' })).status === 302);

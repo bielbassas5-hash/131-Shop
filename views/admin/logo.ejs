@@ -1,0 +1,41 @@
+<%- include('../partials/header') %>
+
+<div class="admin-top">
+  <h1>Logo</h1>
+  <a class="btn ghost" href="/admin">Volver</a>
+</div>
+
+<% if (error) { %><div class="flash error" role="alert"><div class="flash-body"><%= error %></div></div><% } %>
+
+<section class="panel mb24">
+  <h2>Logo actual</h2>
+  <% if (current.light) { %>
+    <div class="logo-preview on-light"><img src="<%= current.light %>" alt="Logo para fondo claro" /></div>
+    <div class="logo-preview on-dark">
+      <% if (current.dark) { %><img src="<%= current.dark %>" alt="Logo para fondo oscuro" /><% } else { %><span class="muted">Sin versión para fondo oscuro: se invertirán los colores de la clara.</span><% } %>
+    </div>
+    <form method="POST" action="/admin/logo/quitar" data-confirm="¿Quitar el logo y volver al texto?">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+      <button class="btn small danger" type="submit">Quitar logo</button>
+    </form>
+  <% } else { %>
+    <p class="muted">Todavía no hay logo propio: se muestra el texto <b>131.</b></p>
+  <% } %>
+</section>
+
+<form class="panel form-card" method="POST" action="/admin/logo?_csrf=<%= csrfToken %>" enctype="multipart/form-data" data-once>
+  <h2>Subir logo</h2>
+  <div class="field">
+    <label for="light">Versión para fondo claro</label>
+    <input id="light" type="file" name="light" accept="image/png,image/webp,image/jpeg" />
+    <p class="field-hint">Es la que se ve en la cabecera. PNG con fondo transparente, de unos 600 px de alto (se muestra a unos 40 px, así se ve nítido en pantallas de alta densidad). Máximo 2 MB.</p>
+  </div>
+  <div class="field">
+    <label for="dark">Versión para fondo oscuro (opcional)</label>
+    <input id="dark" type="file" name="dark" accept="image/png,image/webp,image/jpeg" />
+    <p class="field-hint">Se usa en el pie de página (que es oscuro) y en la cabecera con el tema oscuro. Normalmente es el mismo dibujo en blanco o en colores claros. Si no la subes, se invierten los colores de la versión clara, lo que funciona bien con un logo de un solo color.</p>
+  </div>
+  <button class="btn block" type="submit">Guardar</button>
+</form>
+
+<%- include('../partials/footer') %>

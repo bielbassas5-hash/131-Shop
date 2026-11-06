@@ -35,7 +35,7 @@
   <a class="skip-link" href="#contenido">Saltar al contenido</a>
   <header class="site-header">
     <div class="wrap">
-      <a href="/" class="logo" aria-label="<%= artistName %> - inicio"><%= artistName %><i>.</i></a>
+      <a href="/" class="logo" aria-label="<%= artistName %> - inicio"><%- include('logo', { where: 'header' }) %></a>
       <nav class="nav" aria-label="Principal">
         <a href="/" <%- currentPath === '/' ? 'aria-current="page"' : '' %>>Tienda</a>
         <a href="/temas" <%- currentPath === '/temas' || currentPath.startsWith('/tema/') ? 'aria-current="page"' : '' %>>Temas</a>

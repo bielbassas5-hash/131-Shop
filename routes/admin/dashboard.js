@@ -8,6 +8,7 @@ const { stripeConfigured } = require('../../lib/payments');
 const classify = require('../../lib/classify');
 const { configured: mailConfigured } = require('../../lib/mailer');
 const formats = require('../../lib/formats');
+const siteSettings = require('../../lib/siteSettings');
 const { isWeak } = require('./shared');
 
 const router = express.Router();
@@ -70,6 +71,7 @@ router.get(
     res.render('admin/dashboard', {
       products,
       lowQuality,
+      featuredId: siteSettings.getFeaturedId(),
       backupDue,
       backupDays,
       stats,

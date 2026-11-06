@@ -645,3 +645,17 @@ dialog.lightbox .lb-nav:hover, dialog.lightbox .lb-close:hover { background: rgb
   .sheet h2, .sheet th, .sheet .ref, .label-from { color: #333; }
   .label-box { border-color: #000; }
 }
+
+/* ---------- Logo propio (subido desde el panel) ---------- */
+.logo-img { display: block; height: 2.4rem; width: auto; max-width: 240px; }
+.logo-on-dark { display: none; }
+:root[data-theme='dark'] .logo-on-dark { display: block; }
+:root[data-theme='dark'] .logo-on-light { display: none; }
+.logo-img.invert { filter: invert(1) hue-rotate(180deg); }
+.site-footer .logo-img { height: 3.4rem; max-width: 300px; }
+@media (max-width: 560px) { .logo-img { height: 2rem; } .site-footer .logo-img { height: 2.8rem; } }
+.logo-preview { display: flex; align-items: center; justify-content: center; min-height: 110px; border-radius: var(--radius); padding: 18px; margin-bottom: 10px; }
+.logo-preview img { max-height: 80px; max-width: 100%; width: auto; }
+.logo-preview.on-light { background: #faf8f4; border: 1px solid var(--border); }
+.logo-preview.on-dark { background: #1c1a17; }
+.logo-preview .muted { color: #8a8478; }

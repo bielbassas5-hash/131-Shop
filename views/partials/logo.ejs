@@ -1,0 +1,5 @@
+<%
+  // Logo propio (Panel > Logo) o, si no hay, el texto "131."
+  const lg = (typeof locals.logo !== 'undefined' && locals.logo) || { light: '', dark: '' };
+  const where = (typeof locals.where !== 'undefined' && locals.where) || 'header';
+%><% if (lg.light) { %><% if (where === 'footer') { %><img class="logo-img<%= lg.dark ? '' : ' invert' %>" src="<%= lg.dark || lg.light %>" alt="<%= artistName %>" /><% } else { %><img class="logo-img logo-on-light" src="<%= lg.light %>" alt="<%= artistName %>" /><img class="logo-img logo-on-dark<%= lg.dark ? '' : ' invert' %>" src="<%= lg.dark || lg.light %>" alt="" aria-hidden="true" /><% } %><% } else { %><%= artistName %><i>.</i><% } %>

@@ -133,6 +133,9 @@
       <label class="check" for="active"><input id="active" type="checkbox" name="active" value="1"<%= f.active ? ' checked' : '' %> /><span>Visible en la tienda</span></label>
     </div>
   <% } %>
+  <div class="field">
+    <label class="check" for="featured"><input id="featured" type="checkbox" name="featured" value="1"<%= isFeatured ? ' checked' : '' %> /><span>Mostrar en la portada (la obra grande de la página de inicio; sustituye a la anterior)</span></label>
+  </div>
   <button class="btn block" type="submit"><%= product ? 'Guardar cambios' : 'Publicar producto' %></button>
 </form>
 

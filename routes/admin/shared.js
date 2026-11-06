@@ -13,6 +13,17 @@ const imageFields = upload.fields([
   { name: 'extra', maxCount: MAX_EXTRAS + 1 },
 ]);
 
+const logoFields = upload.fields([
+  { name: 'light', maxCount: 1 },
+  { name: 'dark', maxCount: 1 },
+]);
+function uploadLogo(req, res, next) {
+  logoFields(req, res, (err) => {
+    if (err) req.uploadError = 'No se han podido leer los archivos.';
+    next();
+  });
+}
+
 // Multer sin romper el flujo: el error se guarda en req.uploadError y la ruta lo muestra.
 function uploadImages(req, res, next) {
   imageFields(req, res, (err) => {
@@ -34,4 +45,4 @@ const isWeak = () => {
   return pw.length < 10 || WEAK_PASSWORDS.includes(pw.toLowerCase());
 };
 
-module.exports = { uploadImages, pickFiles, isWeak };
+module.exports = { uploadImages, uploadLogo, pickFiles, isWeak };

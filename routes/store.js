@@ -70,13 +70,23 @@ async function renderCatalog(req, res, theme) {
     products = found.filter((p) => matchesSearch(q, [p.title, p.description, themeNames.get(Number(p.id))])).slice(0, 120);
   }
 
-  // Portada sin filtros: la obra mas reciente se muestra grande y el resto va en la cuadricula
-  const featured = !theme && !tipo && !q && orden === 'nuevo' && products.length >= 5 && products[0].image_path ? products[0] : null;
+  // Portada sin filtros: la obra elegida en el panel se muestra grande (si no hay ninguna, la mas reciente
+  // cuando hay al menos 5 productos) y el resto va en la cuadricula
+  let featured = null;
+  if (!theme && !tipo && !q && orden === 'nuevo') {
+    const chosen = siteSettings.getFeaturedId();
+    if (chosen) {
+      featured = await db.get(`SELECT products.*, ${hoverImage('products')} FROM products WHERE id = ? AND active = 1`, [chosen]);
+      if (featured && !featured.image_path) featured = null;
+    }
+    if (!featured && products.length >= 5 && products[0].image_path) featured = products[0];
+  }
+  const gridProducts = featured ? products.filter((p) => Number(p.id) !== Number(featured.id)) : products;
 
   res.render('index', {
-    products: featured ? products.slice(1) : products,
+    products: gridProducts,
     featured,
-    total: products.length,
+    total: gridProducts.length + (featured ? 1 : 0),
     theme,
     themes,
     filters: { tipo, orden, q, tema: theme ? theme.slug : '' },
