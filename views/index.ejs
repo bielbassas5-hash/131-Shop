@@ -25,12 +25,12 @@
   </div>
 
   <% if (featured) { %>
-    <section class="feature" aria-label="Última obra añadida">
-      <a class="feature-media" href="<%= productUrl(featured) %>" tabindex="-1" aria-hidden="true">
-        <img src="<%= thumb(featured.image_path, 1100) %>" alt="" width="1100" height="1100" fetchpriority="high" decoding="async" />
+    <section class="feature" aria-label="<%= featuredAuto ? 'Última obra añadida' : 'Obra destacada' %>">
+      <a class="feature-media<%= coverPhoto ? ' is-photo' : '' %>" href="<%= productUrl(featured) %>" tabindex="-1" aria-hidden="true">
+        <img src="<%= thumb(coverPhoto || featured.image_path, 1100) %>" alt="" width="1100" height="1100" fetchpriority="high" decoding="async" />
       </a>
       <div class="feature-body">
-        <span class="eyebrow">Última obra añadida · <%= TYPE_LABELS[featured.type] || featured.type %></span>
+        <span class="eyebrow"><%= featuredAuto ? 'Última obra añadida' : 'Destacada' %> · <%= TYPE_LABELS[featured.type] || featured.type %></span>
         <h2><a href="<%= productUrl(featured) %>"><%= featured.title %></a></h2>
         <% if (featured.description) { %><p class="desc"><%= featured.description.replace(/\s+/g, ' ').slice(0, 200) %><%= featured.description.length > 200 ? '…' : '' %></p><% } %>
         <span class="price"><%= featured.variant_count > 0 ? 'Desde ' : '' %><%= euro(featured.price_cents) %></span>

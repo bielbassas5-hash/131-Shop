@@ -79,13 +79,18 @@ async function renderCatalog(req, res, theme) {
       featured = await db.get(`SELECT products.*, ${hoverImage('products')} FROM products WHERE id = ? AND active = 1`, [chosen]);
       if (featured && !featured.image_path) featured = null;
     }
-    if (!featured && products.length >= 5 && products[0].image_path) featured = products[0];
+    // Con foto propia basta con que haya algun producto al que enlazar
+    const minAuto = siteSettings.getCoverPhoto() ? 1 : 5;
+    if (!featured && products.length >= minAuto && products[0].image_path) featured = products[0];
   }
+  const chosenManually = !!(featured && siteSettings.getFeaturedId() === Number(featured.id));
   const gridProducts = featured ? products.filter((p) => Number(p.id) !== Number(featured.id)) : products;
 
   res.render('index', {
     products: gridProducts,
     featured,
+    featuredAuto: !chosenManually && !siteSettings.getCoverPhoto(),
+    coverPhoto: featured ? siteSettings.getCoverPhoto() : '',
     total: gridProducts.length + (featured ? 1 : 0),
     theme,
     themes,

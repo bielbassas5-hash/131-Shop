@@ -1157,6 +1157,28 @@ async function main() {
     check('borrar la obra de portada limpia la eleccion', (await admin.post(`/admin/productos/${p2}/eliminar`, { _csrf: tok })).status === 302 && (await featTitle()) !== undefined);
     await admin.post(`/admin/productos/${p1}/eliminar`, { _csrf: tok });
 
+    console.log('\n# Panel de portada (obra y foto propia)');
+    const uploadsBeforeCover = countUploads();
+    const coverPost = (fields, file) => admin.req('POST', `/admin/portada?_csrf=${tok}`, { multipart: productForm(fields, file) });
+    check('la pagina de portada exige sesion', (await anon.get('/admin/portada')).status === 302 && (await anon.post('/admin/portada', { product: '1' })).status === 403);
+    const coverPage = await admin.get('/admin/portada');
+    check('la pagina de portada lista las obras y la opcion automatica', coverPage.status === 200 && /Automática: la última añadida/.test(coverPage.text) && /<option value="\d+"/.test(coverPage.text));
+    const anyId = coverPage.text.match(/<option value="(\d+)"/)[1];
+    check('elegir una obra desde el panel', (await coverPost({ product: anyId })).status === 302 && new RegExp(`<option value="${anyId}" selected`).test((await admin.get('/admin/portada')).text));
+    const homeChosen = (await anon.get('/')).text;
+    check('la etiqueta ya no dice "Ultima obra añadida" si la obra esta elegida', /class="eyebrow">Destacada/.test(homeChosen) && /aria-label="Obra destacada"/.test(homeChosen));
+    check('una obra inexistente o un valor raro se rechaza', (await coverPost({ product: '999999' })).status === 400 && (await coverPost({ product: 'abc' })).status === 400 && (await coverPost({ product: '1 OR 1=1' })).status === 400);
+    check('un archivo que no es imagen ni PDF se rechaza', (await coverPost({ product: anyId }, { data: Buffer.from('texto de prueba'), type: 'text/plain', name: 'a.txt' })).status === 400);
+    check('los rechazos no dejan archivos huerfanos', countUploads() === uploadsBeforeCover);
+    check('subir una foto propia de portada', (await coverPost({ product: anyId }, png(0))).status === 302);
+    const homePhoto = (await anon.get('/')).text;
+    check('la portada usa la foto propia (llenando el recuadro) y enlaza a la obra', /class="feature-media is-photo" href="\/producto\/\d+-?[^"]*"/.test(homePhoto) && countUploads() === uploadsBeforeCover + 1);
+    check('la foto propia no se usa con filtros', !/is-photo/.test((await anon.get('/?tipo=print')).text));
+    check('cambiar la foto borra la anterior', (await coverPost({ product: anyId }, png(1))).status === 302 && countUploads() === uploadsBeforeCover + 1);
+    check('la pagina del panel muestra la foto actual', /class="cover-preview"/.test((await admin.get('/admin/portada')).text));
+    check('quitar la foto la borra y vuelve a la obra', (await coverPost({ product: anyId, remove_photo: '1' })).status === 302 && countUploads() === uploadsBeforeCover && !/is-photo/.test((await anon.get('/')).text));
+    check('volver a la opcion automatica', (await coverPost({ product: '' })).status === 302 && /class="eyebrow">Última obra añadida/.test((await anon.get('/')).text));
+
     console.log('\n# Logo propio');
     const uploadsBeforeLogo = countUploads();
     const logoPost = (files) => {

@@ -1,0 +1,43 @@
+<%- include('../partials/header') %>
+
+<div class="admin-top">
+  <h1>Portada</h1>
+  <a class="btn ghost" href="/admin">Volver</a>
+</div>
+
+<% if (error) { %><div class="flash error" role="alert"><div class="flash-body"><%= error %></div></div><% } %>
+
+<form class="panel form-card" method="POST" action="/admin/portada?_csrf=<%= csrfToken %>" enctype="multipart/form-data" data-once>
+  <h2>Obra destacada</h2>
+  <div class="field">
+    <label for="product">Obra que sale grande en la página de inicio</label>
+    <select id="product" name="product">
+      <option value="">Automática: la última añadida</option>
+      <% products.forEach((p) => { %>
+        <option value="<%= p.id %>"<%= Number(p.id) === featuredId ? ' selected' : '' %>><%= p.title %> (<%= TYPE_LABELS[p.type] || p.type %>)<%= p.active ? '' : ' · oculta' %></option>
+      <% }) %>
+    </select>
+    <% if (featured && !featured.active) { %><p class="field-error">Esa obra está oculta: mientras lo esté no se muestra y se usa la última añadida.</p><% } %>
+    <p class="field-hint">También puedes marcarla con "Mostrar en la portada" al editar un producto. Con la opción automática hacen falta al menos 5 productos (1 si subes una foto propia).</p>
+  </div>
+
+  <h2 class="mt20">Foto de portada</h2>
+  <% if (photo) { %>
+    <img class="cover-preview" src="<%= thumb(photo, 600) %>" alt="Foto de portada actual" />
+  <% } else { %>
+    <p class="muted">Ahora se usa la imagen de la obra. Puedes subir una foto propia (por ejemplo, la lámina en una pared o tu mesa de trabajo) que ocupe su lugar en la portada; al pulsarla se abre igualmente la obra destacada.</p>
+  <% } %>
+  <div class="field">
+    <label for="image"><%= photo ? 'Cambiar la foto' : 'Subir una foto' %> (opcional)</label>
+    <input id="image" type="file" name="image" accept="image/png,image/jpeg,image/webp,application/pdf,.pdf" />
+    <p class="field-hint">Mejor cuadrada (1:1), de unos 1500 × 1500 px. Se recorta al centro para llenar el recuadro. PNG, JPG, WEBP o PDF; hasta 8 MB (PDF hasta 20 MB).</p>
+  </div>
+  <% if (photo) { %>
+    <div class="field">
+      <label class="check" for="remove_photo"><input id="remove_photo" type="checkbox" name="remove_photo" value="1" /><span>Quitar la foto y volver a mostrar la imagen de la obra</span></label>
+    </div>
+  <% } %>
+  <button class="btn block" type="submit">Guardar portada</button>
+</form>
+
+<%- include('../partials/footer') %>

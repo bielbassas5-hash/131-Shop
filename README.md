@@ -81,6 +81,8 @@ Si se rellenan, el cliente elige formato en la ficha, el listado muestra "Desde 
 
 **Obra de portada.** En el formulario de cada producto hay una casilla "Mostrar en la portada": esa obra se ve grande en la página de inicio (solo una a la vez; al marcar otra sustituye a la anterior). El panel la señala con la etiqueta "Portada". Si no eliges ninguna (o la elegida está oculta o borrada), se usa la última añadida cuando hay al menos 5 productos. Con filtros o búsqueda no se muestra.
 
+**Panel → Portada.** Reúne los dos ajustes en una sola pantalla: la obra destacada (desplegable, o "Automática: la última añadida") y una **foto propia** opcional (PNG, JPG, WEBP o PDF) que ocupa el recuadro grande de la portada en lugar de la imagen de la obra; al pulsarla se abre igualmente la obra destacada. La foto se recorta al centro para llenar el recuadro (mejor cuadrada). Con foto propia basta con 1 producto; sin ella, la opción automática pide al menos 5.
+
 **Logo propio.** Panel → Logo: sube un PNG (mejor transparente), WEBP o JPG de hasta 2 MB para fondo claro y, opcionalmente, otra versión para fondo oscuro (pie y tema oscuro). Sin la versión oscura se invierten los colores de la clara. No se admite SVG a propósito, porque puede llevar scripts. "Quitar logo" vuelve al texto "131.".
 
 ### Subir PDF

@@ -659,3 +659,8 @@ dialog.lightbox .lb-nav:hover, dialog.lightbox .lb-close:hover { background: rgb
 .logo-preview.on-light { background: #faf8f4; border: 1px solid var(--border); }
 .logo-preview.on-dark { background: #1c1a17; }
 .logo-preview .muted { color: #8a8478; }
+
+/* Foto propia en la portada: ocupa todo el recuadro (no es una obra sobre paspartu) */
+.feature-media.is-photo { background: var(--bg-soft); }
+.feature-media.is-photo img { inset: 0; width: 100%; height: 100%; object-fit: cover; filter: none; }
+.cover-preview { display: block; width: 100%; max-width: 360px; aspect-ratio: 1 / 1; object-fit: cover; border-radius: var(--radius); background: var(--bg-soft); margin-bottom: 12px; }
