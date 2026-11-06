@@ -77,6 +77,10 @@ A2: 45,00
 
 Si se rellenan, el cliente elige formato en la ficha, el listado muestra "Desde 18,00 €" y el carrito y el pedido guardan el formato elegido ("Ojo de tigre · A3") con su precio, que siempre se recalcula en el servidor. Si quitas los formatos, el producto vuelve a su precio normal y los carritos que tuvieran un formato retirado se limpian solos.
 
+### Subir PDF
+
+El campo de imagen (portada y adicionales) acepta **PDF** además de PNG, JPG, WEBP y GIF. Se usa la primera página y se convierte a una imagen de hasta 2000 px para la web (con fondo blanco). Las imágenes admiten hasta 8 MB y los PDF hasta 20 MB (máximo 2 PDF por envío). La tienda no guarda el PDF: para imprimir sigues usando tu archivo original. Con un PDF no se puede medir la resolución, así que no se muestra la calidad por formato y marcas tú los formatos. Los PDF con contraseña o dañados se rechazan con un aviso.
+
 ### Ficha técnica y página "Sobre mí"
 
 En el formulario de producto, "Ficha técnica" admite hasta 8 líneas con el formato `Etiqueta: valor` (por ejemplo `Papel: 250 g/m²`). Se muestran como tabla bajo la descripción. Cada producto tiene una referencia automática (`131-0007`) que aparece en la ficha y en los datos estructurados.

@@ -91,8 +91,8 @@
     <label for="image">Imagen <%= product ? '(deja vacío para mantener la actual)' : '' %></label>
     <% if (product && product.image_path) { %><img class="preview" src="<%= thumb(product.image_path, 300) %>" alt="Imagen actual" /><% } %>
     <img id="image-preview" class="preview" alt="Vista previa" hidden />
-    <input id="image" type="file" name="image" accept="image/png,image/jpeg,image/webp,image/gif" data-preview <%= product ? '' : 'required' %> />
-    <p class="field-hint">PNG, JPG, WEBP o GIF. Máximo 8 MB. Mejor cuadrada (por ejemplo 1500 x 1500 px).</p>
+    <input id="image" type="file" name="image" accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,.pdf" data-preview <%= product ? '' : 'required' %> />
+    <p class="field-hint">PNG, JPG, WEBP, GIF o <b>PDF</b> (se usa la primera página). Imágenes hasta 8 MB y PDF hasta 20 MB. Con un PDF la web guarda una versión de 2000 px; tu archivo original sigue siendo el que usas para imprimir, y la calidad por formato no se puede medir (marca los formatos tú).</p>
   </div>
   <div class="field">
     <label for="extra">Imágenes adicionales (opcional, hasta <%= maxExtras %>)</label>
@@ -106,7 +106,7 @@
         <% }) %>
       </div>
     <% } %>
-    <input id="extra" type="file" name="extra" multiple accept="image/png,image/jpeg,image/webp,image/gif" />
+    <input id="extra" type="file" name="extra" multiple accept="image/png,image/jpeg,image/webp,image/gif,application/pdf,.pdf" />
     <p class="field-hint">Detalles, escala, reverso... Se muestran como galería en la ficha del producto.</p>
   </div>
   <fieldset class="field method-box themes-box">

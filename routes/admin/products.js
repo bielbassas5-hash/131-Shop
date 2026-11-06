@@ -3,7 +3,7 @@ const express = require('express');
 const db = require('../../db');
 const { requireAdmin } = require('../../middleware/auth');
 const { deleteImage, UserError } = require('../../lib/imageStorage');
-const { MAX_EXTRAS, extrasOf, validateFiles, saveMany, addExtras, removeExtras, removeAllExtras } = require('../../lib/productImages');
+const { MAX_EXTRAS, extrasOf, prepareFiles, saveMany, addExtras, removeExtras, removeAllExtras } = require('../../lib/productImages');
 const { wrap } = require('../../lib/security');
 const { validateProduct } = require('../../lib/validate');
 const { MAX_VARIANTS, parseVariantsText, toText, variantsOf, replaceVariants } = require('../../lib/variants');
@@ -49,6 +49,9 @@ async function applyThemes(product, body, { buffer } = {}) {
 
 const describeDetection = (d) =>
   d && d.names.length ? ` Temas detectados ${d.source === 'ai' ? 'con IA' : 'por palabras clave'}: ${d.names.join(', ')}.` : '';
+
+const pdfNote = (files) =>
+  files.some((f) => f && f.fromPdf) ? ' El PDF se ha convertido a imagen para la web (página 1); la calidad de impresión depende de tu archivo original.' : '';
 
 const priceText = (cents) => (cents / 100).toFixed(2).replace('.', ',');
 
@@ -202,14 +205,14 @@ router.post(
     let coverPath;
     let extraPaths;
     try {
-      validateFiles([cover, ...extras]);
+      await prepareFiles([cover, ...extras]);
       [coverPath, ...extraPaths] = await saveMany([cover, ...extras]);
     } catch (rawErr) {
       const err = rawErr instanceof UserError ? rawErr : uploadFailure(rawErr);
       return renderForm(res, { form: { ...v.values, ...themeForm(req.body) }, errors: v.errors, error: err.message, status: 400 });
     }
 
-    const dims = resolveDims(v.values, cover.buffer, null);
+    const dims = resolveDims(v.values, cover.fromPdf ? null : cover.buffer, null);
     const created = await db.run(
       `INSERT INTO products (title, description, price_cents, image_path, type, stock, active, source_width, source_height, details)
        VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
@@ -222,7 +225,7 @@ router.post(
       req.body,
       { buffer: cover.buffer }
     );
-    req.session.flash = { type: 'success', msg: `"${v.values.title}" publicado.${describeDetection(detection)}${qualityWarning(variants, dims)}` };
+    req.session.flash = { type: 'success', msg: `"${v.values.title}" publicado.${describeDetection(detection)}${qualityWarning(variants, dims)}${pdfNote([cover, ...extras])}` };
     res.redirect('/admin');
   })
 );
@@ -272,7 +275,7 @@ router.post(
     let extraPaths = [];
     try {
       const incoming = [cover, ...extras].filter(Boolean);
-      validateFiles(incoming);
+      await prepareFiles(incoming);
       const saved = await saveMany(incoming);
       coverPath = cover ? saved.shift() : null;
       extraPaths = saved;
@@ -282,7 +285,7 @@ router.post(
     }
 
     const image_path = coverPath || product.image_path;
-    const dims = resolveDims(v.values, cover ? cover.buffer : null, product);
+    const dims = resolveDims(v.values, cover && !cover.fromPdf ? cover.buffer : null, product);
     await db.run(
       `UPDATE products SET title = ?, description = ?, price_cents = ?, image_path = ?, type = ?, stock = ?, active = ?,
          source_width = ?, source_height = ?, details = ?
@@ -298,7 +301,7 @@ router.post(
       req.body,
       { buffer: cover ? cover.buffer : undefined }
     );
-    req.session.flash = { type: 'success', msg: `Cambios guardados.${describeDetection(detection)}${qualityWarning(variants, dims)}` };
+    req.session.flash = { type: 'success', msg: `Cambios guardados.${describeDetection(detection)}${qualityWarning(variants, dims)}${pdfNote([cover, ...extras])}` };
     res.redirect('/admin');
   })
 );

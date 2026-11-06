@@ -217,6 +217,10 @@
       var file = fileInput.files && fileInput.files[0];
       var img = document.getElementById('image-preview');
       if (!file || !img) return;
+      if (file.type === 'application/pdf' || /\.pdf$/i.test(file.name)) {
+        img.hidden = true; // un PDF no se puede previsualizar como imagen: se convierte al guardar
+        return;
+      }
       img.src = URL.createObjectURL(file);
       img.hidden = false;
       // Tamaño en pixeles del archivo elegido -> calidad de cada formato

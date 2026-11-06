@@ -14,6 +14,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",
     "@libsql/client": "^0.17.4",
+    "@napi-rs/canvas": "^1.1.0",
     "cloudinary": "^2.10.1",
     "compression": "^1.8.2",
     "dotenv": "^16.4.5",
@@ -22,6 +23,7 @@
     "express-session": "^1.18.0",
     "helmet": "^8.3.0",
     "multer": "^2.0.1",
+    "pdfjs-dist": "^6.5.438",
     "stripe": "^16.12.0",
     "zod": "^4.6.5"
   }

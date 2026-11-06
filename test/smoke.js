@@ -67,6 +67,29 @@ const PNG = Buffer.from(
   'base64'
 );
 
+// PDF minimo valido (una pagina con un rectangulo y texto) para probar la conversion
+function makePdf({ w = 595, h = 842 } = {}) {
+  const content = `1 0.5 0 rg 60 60 ${w - 120} ${h - 200} re f\n0 g BT /F1 48 Tf 80 ${h - 100} Td (Hola 131) Tj ET`;
+  const objs = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${w} ${h}] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>`,
+    `<< /Length ${content.length} >>\nstream\n${content}\nendstream`,
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+  ];
+  let out = '%PDF-1.4\n';
+  const offsets = [];
+  objs.forEach((o, i) => {
+    offsets.push(out.length);
+    out += `${i + 1} 0 obj\n${o}\nendobj\n`;
+  });
+  const xref = out.length;
+  out += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n`;
+  for (const o of offsets) out += String(o).padStart(10, '0') + ' 00000 n \n';
+  out += `trailer\n<< /Size ${objs.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  return Buffer.from(out, 'latin1');
+}
+
 function productForm(fields, file, extras = []) {
   const fd = new FormData();
   for (const [k, v] of Object.entries(fields)) {
@@ -1114,6 +1137,37 @@ async function main() {
     await sleep(600);
     const alerts = mailTo('owner@example.com', /Intentos fallidos de acceso/);
     check('aviso por email tras varios intentos fallidos (solo uno por hora)', alerts.length === 1 && /IP 127\.0\.0\.1|IP ::1|IP ::ffff:127\.0\.0\.1/.test(alerts[0].textContent), String(alerts.length));
+
+    console.log('\n# Subida de PDF');
+    const pdfFile = (name = 'dibujo.pdf', data = makePdf()) => ({ data, type: 'application/pdf', name });
+    const pfields = { title: 'Dibujo en PDF', description: 'Original vectorial', type: 'print', stock: '5', price: '20', fmt: ['A4', 'A3'], fmt_price_A4: '18', fmt_price_A3: '28' };
+    const pcreate = (extra, file, extras = []) =>
+      admin.req('POST', `/admin/productos/nuevo?_csrf=${tok}`, { multipart: productForm({ ...pfields, ...extra }, file, extras) });
+    const uploadsBefore = countUploads();
+    const badPdf = await pcreate({ title: 'PDF roto' }, pdfFile('roto.pdf', Buffer.from('%PDF-1.4\nesto no es un pdf de verdad\n%%EOF\n')));
+    check('un PDF dañado se rechaza con un mensaje claro', badPdf.status === 400 && /No se ha podido leer .{1,6}roto\.pdf/.test(badPdf.text));
+    check('un PDF rechazado no deja archivos huerfanos', countUploads() === uploadsBefore);
+    check('un archivo que no es imagen ni PDF se rechaza', (await pcreate({ title: 'Texto' }, { data: Buffer.from('hola mundo, esto es texto'), type: 'text/plain', name: 'a.txt' })).status === 400);
+    const bigPngFile = { data: Buffer.concat([png(0).data, Buffer.alloc(9 * 1024 * 1024)]), type: 'image/png', name: 'grande.png' };
+    const bigRes = await pcreate({ title: 'PNG enorme' }, bigPngFile);
+    check('una imagen de mas de 8 MB se rechaza (los PDF admiten 20 MB)', bigRes.status === 400 && /supera los 8/.test(bigRes.text));
+    const hugePdf = await pcreate({ title: 'PDF enorme' }, pdfFile('enorme.pdf', Buffer.concat([makePdf(), Buffer.alloc(21 * 1024 * 1024)])));
+    check('un archivo de mas de 20 MB se rechaza', hugePdf.status === 400 && /20 MB/.test(hugePdf.text));
+    check('mas de 2 PDF a la vez se rechaza', (await pcreate({ title: 'Tres PDF' }, pdfFile(), [pdfFile('b.pdf'), pdfFile('c.pdf')])).status === 400);
+
+    const okPdf = await pcreate({}, pdfFile());
+    check('un PDF valido se convierte y se publica', okPdf.status === 302);
+    check('el panel avisa de que el PDF se convirtio', (await admin.get('/admin')).text.includes('El PDF se ha convertido a imagen'));
+    const pdfId = (await anon.get('/?q=Dibujo%20en%20PDF')).text.match(/\/producto\/(\d+)-dibujo-en-pdf/)[1];
+    const pdfPage = (await anon.get(`/producto/${pdfId}`)).text;
+    const pdfImg = pdfPage.match(/id="main-image" src="([^"]+)"/)[1];
+    const pdfBytes = Buffer.from(await (await fetch(BASE + pdfImg)).arrayBuffer());
+    check('la imagen publicada es un PNG real de la pagina (2000 px de alto)', pdfBytes.subarray(1, 4).toString() === 'PNG' && pdfBytes.readUInt32BE(20) === 2000 && pdfBytes.readUInt32BE(16) === 1413);
+    const pdfEdit = (await admin.get(`/admin/productos/${pdfId}/editar`)).text;
+    check('con PDF no se inventa una resolucion (campos vacios, sin calidad por formato)', /id="source_width"[^>]*value=""/.test(pdfEdit) && !/Calidad (óptima|aceptable)|Resolución baja \(/.test(pdfEdit));
+    check('el formulario anuncia que acepta PDF', /accept="[^"]*application\/pdf/.test(pdfEdit));
+    check('un PDF tambien sirve como imagen adicional', (await admin.req('POST', `/admin/productos/${pdfId}/editar?_csrf=${tok}`, { multipart: productForm({ ...pfields, active: '1' }, null, [pdfFile('extra.pdf')]) })).status === 302 && /data-gallery-src/.test((await anon.get(`/producto/${pdfId}`)).text));
+    check('eliminar el producto con PDF borra sus archivos', (await admin.post(`/admin/productos/${pdfId}/eliminar`, { _csrf: tok })).status === 302 && countUploads() === uploadsBefore);
 
     console.log('\n# Portada: obra destacada');
     const homeAll = (await anon.get('/')).text;

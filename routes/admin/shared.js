@@ -6,7 +6,7 @@ const WEAK_PASSWORDS = ['arte131', 'admin', 'password', '123456', '131', 'contra
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 8 * 1024 * 1024, files: 1 + MAX_EXTRAS },
+  limits: { fileSize: 20 * 1024 * 1024, files: 1 + MAX_EXTRAS },
 });
 const imageFields = upload.fields([
   { name: 'image', maxCount: 1 },
@@ -18,7 +18,7 @@ function uploadImages(req, res, next) {
   imageFields(req, res, (err) => {
     if (err) {
       req.uploadError =
-        err.code === 'LIMIT_FILE_SIZE' ? 'Alguna imagen supera los 8 MB.' : 'No se han podido leer las imágenes.';
+        err.code === 'LIMIT_FILE_SIZE' ? 'Algún archivo supera los 20 MB.' : 'No se han podido leer las imágenes.';
     }
     next();
   });
