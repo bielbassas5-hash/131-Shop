@@ -55,8 +55,9 @@
     <legend>Formatos y precios (opcional)</legend>
     <p class="field-hint" data-dims-hint><%= dims ? 'Resolución de la imagen: ' + dims.width + ' × ' + dims.height + ' px.' : 'Al elegir la imagen verás qué formatos permite con buena calidad.' %></p>
     <div class="format-rows">
-      <% formatRows.forEach((r) => { %>
-        <div class="format-row" data-short-mm="<%= Math.min(...r.mm) %>" data-long-mm="<%= Math.max(...r.mm) %>">
+      <% let lastGroup = ''; formatRows.forEach((r) => { %>
+        <% if (r.group !== lastGroup) { lastGroup = r.group; %><p class="format-group"><%= groupLabels[r.group] %></p><% } %>
+        <div class="format-row" data-group="<%= r.group %>" data-short-mm="<%= Math.min(...r.mm) %>" data-long-mm="<%= Math.max(...r.mm) %>">
           <label class="check"><input type="checkbox" name="fmt" value="<%= r.id %>"<%= r.checked ? ' checked' : '' %> /><span><b><%= r.label %></b></span></label>
           <input type="text" inputmode="decimal" name="fmt_price_<%= r.id %>" value="<%= r.price %>" placeholder="Precio €" aria-label="Precio del formato <%= r.id %>" />
           <span class="quality<%= r.level ? ' q-' + r.level : '' %>" data-quality><%= r.level ? r.levelLabel + ' (' + r.ppp + ' ppp)' : '' %></span>

@@ -63,9 +63,9 @@ Al subir un producto, si no eliges ningún tema y dejas marcada la casilla, se d
 
 ### Formatos con precio propio
 
-Los formatos los **activas tú en cada producto**: solo existen los que marques. En el formulario hay casillas con precio para los estándar (A5, A4, A3, A2, A1; se propone el último precio que usaste) y un cuadro para formatos propios.
+Los formatos los **activas tú en cada producto**: solo existen los que marques. En el formulario hay casillas con precio para los estándar (prints: A5, A4, A3, A2, A1; stickers: 4 × 4 y 5 × 5 cm; se propone el último precio que usaste) y un cuadro para formatos propios.
 
-**Calidad según la resolución.** Al elegir la imagen, el formulario lee su tamaño en píxeles y muestra qué calidad daría en cada formato: óptima desde 300 ppp, aceptable desde 200 ppp y resolución baja por debajo. En un producto nuevo se marcan solos los de calidad óptima. Tú decides: si activas uno de resolución baja, al guardar recibes un aviso. Si subes una versión reducida y guardas el original aparte, corrige el ancho y alto del original en el mismo formulario. La tienda guarda una versión web de la imagen (máx. 2000 px); para imprimir se usa tu archivo original.
+**Calidad según la resolución.** Al elegir la imagen, el formulario lee su tamaño en píxeles y muestra qué calidad daría en cada formato: óptima desde 300 ppp, aceptable desde 200 ppp y resolución baja por debajo. En un producto nuevo se marcan solos los de calidad óptima del tipo elegido (medidas pequeñas para stickers, serie A para prints y dibujos). Tú decides: si activas uno de resolución baja, al guardar recibes un aviso. Si subes una versión reducida y guardas el original aparte, corrige el ancho y alto del original en el mismo formulario. La tienda guarda una versión web de la imagen (máx. 2000 px); para imprimir se usa tu archivo original.
 
 Un producto puede tener hasta 8 formatos en total, cada uno con su precio. Los formatos propios se escriben una línea por formato, con el nombre y el precio separados por dos puntos:
 

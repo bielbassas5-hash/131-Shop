@@ -1138,6 +1138,22 @@ async function main() {
     const alerts = mailTo('owner@example.com', /Intentos fallidos de acceso/);
     check('aviso por email tras varios intentos fallidos (solo uno por hora)', alerts.length === 1 && /IP 127\.0\.0\.1|IP ::1|IP ::ffff:127\.0\.0\.1/.test(alerts[0].textContent), String(alerts.length));
 
+    console.log('\n# Formatos de sticker (4x4 y 5x5 cm)');
+    check('hay presets de sticker ademas de la serie A', fmtLib.PRESETS.filter((p) => p.group === 'sticker').map((p) => p.id).join() === '4x4,5x5' && fmtLib.PRESETS[0].id === 'A5');
+    check('un sticker de 1000 px da calidad optima en 5x5 cm', fmtLib.assess({ width: 1000, height: 1000 }, fmtLib.PRESETS.find((p) => p.id === '5x5')).level === 'optima');
+    const stkForm = (await admin.get('/admin/productos/nuevo')).text;
+    check('el formulario agrupa los formatos y lista 4x4 y 5x5', /Prints y láminas/.test(stkForm) && /class="format-group">Stickers/.test(stkForm) && /name="fmt" value="4x4"/.test(stkForm) && /name="fmt_price_5x5"/.test(stkForm));
+    const sfields = { title: 'Sticker con tamaños', description: 'Vinilo', type: 'sticker', stock: '5', price: '', fmt: ['4x4', '5x5'], fmt_price_4x4: '2', fmt_price_5x5: '3' };
+    check('un sticker con formatos 4x4 y 5x5 se publica', (await admin.req('POST', `/admin/productos/nuevo?_csrf=${tok}`, { multipart: productForm(sfields, png(0)) })).status === 302);
+    const stkId = (await anon.get('/?q=Sticker%20con')).text.match(/\/producto\/(\d+)-sticker-con-tamanos/)[1];
+    const stkPage = (await anon.get(`/producto/${stkId}`)).text;
+    check('la ficha ofrece 4 × 4 cm y 5 × 5 cm con su precio', stkPage.includes('4 × 4 cm') && stkPage.includes('5 × 5 cm') && /data-price-label="3,00\s€"/.test(stkPage) && /id="product-price">2,00\s€/.test(stkPage));
+    check('la comparacion de tamaños tambien sirve para stickers (ampliados)', (stkPage.match(/data-size-variant=/g) || []).length === 2 && /width="500" height="500"/.test(stkPage));
+    const sg = fmtLib.sizeGuide([{ id: 1, label: 'A4 (21 × 29,7 cm)' }, { id: 2, label: 'A3 (29,7 × 42 cm)' }, { id: 3, label: '5 × 5 cm' }]);
+    check('la comparacion no mezcla laminas con stickers', sg && sg.rects.length === 2 && sg.rects.every((r) => r.id.startsWith('A')));
+    check('un solo formato de cada grupo no genera comparacion', fmtLib.sizeGuide([{ id: 1, label: 'A4 (21 × 29,7 cm)' }, { id: 2, label: '5 × 5 cm' }]) === null);
+    check('eliminar el sticker de prueba', (await admin.post(`/admin/productos/${stkId}/eliminar`, { _csrf: tok })).status === 302);
+
     console.log('\n# Subida de PDF');
     const pdfFile = (name = 'dibujo.pdf', data = makePdf()) => ({ data, type: 'application/pdf', name });
     const pfields = { title: 'Dibujo en PDF', description: 'Original vectorial', type: 'print', stock: '5', price: '20', fmt: ['A4', 'A3'], fmt_price_A4: '18', fmt_price_A3: '28' };

@@ -186,6 +186,8 @@
     if (!formatsBox || !wInput || !hInput) return;
     var w = parseInt(wInput.value, 10);
     var h = parseInt(hInput.value, 10);
+    var typeSel = document.getElementById('type');
+    var wantedGroup = typeSel && typeSel.value === 'sticker' ? 'sticker' : 'print';
     var hint = formatsBox.querySelector('[data-dims-hint]');
     if (hint) hint.textContent = w > 0 && h > 0 ? 'Resolución de la imagen: ' + w + ' × ' + h + ' px.' : 'Al elegir la imagen verás qué formatos permite con buena calidad.';
     formatsBox.querySelectorAll('.format-row').forEach(function (row) {
@@ -202,8 +204,13 @@
       q.textContent = LEVEL_LABELS[level] + ' (' + ppp + ' ppp)';
       q.className = 'quality q-' + level;
       // En un producto nuevo se proponen solo los formatos con calidad optima
-      if (autoCheck) row.querySelector('input[type="checkbox"]').checked = level === 'optima';
+      // (solo los del grupo del tipo elegido: laminas para prints y dibujos, medidas pequeñas para stickers)
+      if (autoCheck) row.querySelector('input[type="checkbox"]').checked = level === 'optima' && row.getAttribute('data-group') === wantedGroup;
     });
+  }
+  var typeInput = document.getElementById('type');
+  if (typeInput && formatsBox && formatsBox.hasAttribute('data-autocheck')) {
+    typeInput.addEventListener('change', function () { refreshQuality(true); });
   }
   if (wInput && hInput) {
     wInput.addEventListener('input', function () { refreshQuality(false); });

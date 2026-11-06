@@ -617,3 +617,6 @@ dialog.lightbox .lb-nav:hover, dialog.lightbox .lb-close:hover { background: rgb
 .card-media img { animation: fadein .5s ease backwards; }
 @keyframes fadein { from { opacity: 0; } }
 .card-media img.alt { animation: none; }
+
+.format-group { margin: 14px 0 2px; font-size: .72rem; text-transform: uppercase; letter-spacing: .12em; font-weight: 600; color: var(--muted); }
+.format-group:first-child { margin-top: 0; }

@@ -179,6 +179,7 @@ async function renderForm(res, { product = null, form = null, errors = {}, error
     formatRows,
     dims,
     maxVariants: MAX_VARIANTS,
+    groupLabels: formats.GROUP_LABELS,
     maxDetails: MAX_DETAILS,
     maxExtras: MAX_EXTRAS,
     allThemes,
